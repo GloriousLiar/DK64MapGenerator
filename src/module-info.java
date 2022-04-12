@@ -1,0 +1,2 @@
+module DK64MapGenerator {
+}
