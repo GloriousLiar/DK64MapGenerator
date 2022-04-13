@@ -12,8 +12,8 @@ import java.util.Iterator;
 import java.util.Scanner;
 
 public class MapGenerator {
-	public static final String fileName = "C:\\Learning\\eclipse-workspace\\DK64MapGenerator\\meshes\\sample mesh 2.csv";
-	public static final String dirOut = "C:\\Users\\Jacob\\Desktop\\mesh-output\\";
+	public static final String fileName = "C:\\Learning\\eclipse-workspace\\DK64MapGenerator\\meshes\\castle-0-indexed.csv";
+	public static final String dirOut = "C:\\Users\\Jacob\\Desktop\\mesh-output-castle\\";
 	
 	public static ArrayList<Vertex> verts;
 	public static ArrayList<Triangle> tris;
@@ -70,7 +70,7 @@ public class MapGenerator {
 		int index=0;
 		byte[] vertArray = new BigInteger("0102004006000000",16).toByteArray(); //start loading vertices at index 0
 		byte[] colorArray = new BigInteger("FC7EA004100C00F4",16).toByteArray(); //set color combine mode
-		byte[] geometryModeArray = new BigInteger("D900000000000401",16).toByteArray(); //set Z-DEPTH
+		byte[] geometryModeArray = new BigInteger("D900000000000201",16).toByteArray(); //set Z-DEPTH
 		byte[] otherModeArray = new BigInteger("E200031D00552230",16).toByteArray(); //set surfaces to opaque
 		for(int i=1; i<colorArray.length; ++i) byteList.add(colorArray[i]);
 		for(int i=1; i<geometryModeArray.length; ++i) byteList.add(geometryModeArray[i]);
@@ -81,7 +81,7 @@ public class MapGenerator {
 			System.out.println("Face "+(index++)+" buffer chunk: "+buffer_chunk);
 			System.out.println(line[0]+" "+line[1]+" "+line[2]+" color: "+line[3]);
 			//Handle face-color
-			if(Long.parseLong(line[3],16) != prev_color) {
+			if(Long.parseLong(line[3],16) != prev_color) {				
 				String color = line[3];
 				while(color.length() < 8) color="0"+color;//pad with 0s
 				colorArray = new BigInteger("FA000000"+color,16).toByteArray();//set primary color
@@ -177,8 +177,8 @@ public class MapGenerator {
 				byteList.add(b);
 		}
 		ArrayList<Byte> header = new ArrayList<Byte>();
-		byte[] bArray = new BigInteger(String.format("0000000f%08x",tris.size()*24+8),16).toByteArray();
-		System.out.println(String.format("0000000f%08x",tris.size()*24+8));
+		byte[] bArray = new BigInteger(String.format("%08x%08x",tris.size()*3,tris.size()*24+8),16).toByteArray();
+		System.out.println(String.format("%08x%08x",tris.size()/2,tris.size()*24+8));
 
 		for(int i=0; i<(8 - bArray.length); ++i) header.add((byte)0); //pad if leading 00s get truncated
 		for(byte b: bArray)
