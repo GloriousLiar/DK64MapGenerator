@@ -5,6 +5,9 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -15,17 +18,28 @@ import java.util.Random;
 import java.util.Scanner;
 
 public class MapGenerator {
-	public static final String fileName = "C:\\Learning\\eclipse-workspace\\DK64MapGenerator\\meshes\\SM.csv";
-	public static final String dirOut = "C:\\Users\\Jacob\\Desktop\\BK-Mesh\\";
+	public static final String fileName = "C:\\Learning\\eclipse-workspace\\DK64MapGenerator\\meshes\\jitb-mesh.csv";
+	public static final String dirOut = "C:\\Users\\Jacob\\Desktop\\Junk-In-The-Box\\";
 	
 	public static ArrayList<Vertex> verts;
 	public static ArrayList<Triangle> tris;
+	
+	public static byte[] 	geometryHeader,
+							geometryVertices,
+							geometryF3DEX2,
+							geometryFooter;
+	
+	public static String floorSize, wallSize;
+	
+	public static int f3dex2Size;
 	
 	public static void main(String[] args) throws IOException, FileNotFoundException {
 		File file = new File(fileName);
 		generateGeometryFileVertices(file);
 		generateGeometryFileFaces(file);
 		generateFloorFile();
+		generateHeaderAndFooter();
+		generateGeometryFile();
 	}
 
 	public static void generateGeometryFileVertices(File f) throws IOException {
@@ -50,6 +64,8 @@ public class MapGenerator {
 		}
 		byte[] data = new byte[byteList.size()];
 		for(int i=0; i<byteList.size(); ++i) data[i] = byteList.get(i).byteValue();
+		
+		geometryVertices = data;
 		
 		FileOutputStream fos = new FileOutputStream(dirOut+"geometry-file-vertices.bin");
 		fos.write(data);
@@ -168,12 +184,65 @@ public class MapGenerator {
 		byte[] data = new byte[byteList.size()];
 		for(int i=0; i<byteList.size(); ++i) data[i] = byteList.get(i).byteValue();
 		
+		f3dex2Size = byteList.size();
+		geometryF3DEX2 = data;
+		
 		FileOutputStream fos = new FileOutputStream(dirOut+"geometry-file-faces.bin");
 		fos.write(data);
 		fos.flush();
 		fos.close();
 		
 		tris = triData;
+	}
+	
+	public static void generateHeaderAndFooter() throws IOException {
+		Path path = Paths.get("C:\\Learning\\eclipse-workspace\\DK64MapGenerator\\setup\\footer.bin");
+		byte[] footer =  Files.readAllBytes(path);
+		
+		geometryFooter = footer;
+		
+		path = Paths.get("C:\\Learning\\eclipse-workspace\\DK64MapGenerator\\setup\\header.bin");
+		byte[] header = Files.readAllBytes(path);
+		
+		byte[] 	floorSizeBytes = new BigInteger(floorSize,16).toByteArray(),
+				wallSizeBytes = new BigInteger(wallSize,16).toByteArray(),
+				f3dex2SizeBytes = new BigInteger(String.format("%08x",f3dex2Size+0x140),16).toByteArray(),
+				footerBytes = new BigInteger(String.format("%08x",verts.size()*16+f3dex2Size+0x140),16).toByteArray();
+		int index = 4 - floorSizeBytes.length;
+		for(byte b: floorSizeBytes) header[index++] = b;
+		index = 8 - wallSizeBytes.length;
+		for(byte b: floorSizeBytes) header[index++] = b;
+		
+		index = 60 - f3dex2SizeBytes.length;
+		for(byte b: f3dex2SizeBytes) header[index++] = b;
+		
+		index = 68 - footerBytes.length;
+		for(byte b: footerBytes) header[index++] = b;
+		int[] addressOffsets = {4,4,4,4,4,4,4,16,0,16,0,4};
+		index = 72;
+		BigInteger nextAddress = new BigInteger(String.format("%08x",verts.size()*16+f3dex2Size+0x140),16);
+		for(int i=0; i<addressOffsets.length; ++i) {
+			nextAddress = nextAddress.add(new BigInteger(""+addressOffsets[i]));
+			footerBytes = nextAddress.toByteArray();
+			index = index - footerBytes.length;
+			for(byte b: footerBytes) header[index++] = b;
+			index+=4;
+		}
+		geometryHeader = header;
+	}
+	
+	public static void generateGeometryFile() throws IOException {
+		FileOutputStream fos = new FileOutputStream(dirOut+"geometry.bin");
+		ArrayList<Byte> byteList = new ArrayList<>();
+		for(byte b: geometryHeader) byteList.add(b);
+		for(byte b: geometryF3DEX2) byteList.add(b);
+		for(byte b: geometryVertices) byteList.add(b);
+		for(byte b: geometryFooter) byteList.add(b);
+		byte[] output = new byte[byteList.size()];
+		for(int i=0; i<byteList.size(); ++i) output[i] = byteList.get(i);
+		fos.write(output);
+		fos.flush();
+		fos.close();
 	}
 	
 	public static void generateFloorFile() throws IOException {
@@ -203,14 +272,14 @@ public class MapGenerator {
 			byte[] bArray = new BigInteger(String.format("%04x%04x%04x%04x%04x%04x%04x%04x%04x000001000F70",t.x[0]*6,t.x[1]*6,t.x[2]*6, 
 																											t.y[0]*6,t.y[1]*6,t.y[2]*6, 
 																											t.z[0]*6,t.z[1]*6,t.z[2]*6),16).toByteArray();
-			byte[] bArray2 = new BigInteger(String.format("%04x%04x%04x%04x%04x%04x%04x%04x%04x0BFE01FF0018",t.x[0],t.x[1],t.x[2], 
+			byte[] bArray2 = new BigInteger(String.format("%04x%04x%04x%04x%04x%04x%04x%04x%04x0000014A07FF",t.x[0],t.x[1],t.x[2], 
 					t.y[0],t.y[1],t.y[2], 
 					t.z[0],t.z[1],t.z[2]),16).toByteArray();
 
 			System.out.println(String.format("f %04x%04x%04x%04x%04x%04x%04x%04x%04x000001000F70",t.x[0]*6,t.x[1]*6,t.x[2]*6, 
 					t.y[0]*6,t.y[1]*6,t.y[2]*6, 
 					t.z[0]*6,t.z[1]*6,t.z[2]*6));
-			System.out.println(String.format("w %04x%04x%04x%04x%04x%04x%04x%04x%04x0BFE01FF0018",t.x[0],t.x[1],t.x[2], 
+			System.out.println(String.format("w %04x%04x%04x%04x%04x%04x%04x%04x%04x0000014A07FF",t.x[0],t.x[1],t.x[2], 
 					t.y[0],t.y[1],t.y[2], 
 					t.z[0],t.z[1],t.z[2]));
 			for(int j=0; j<(24 - bArray.length); ++j) byteList.add((byte)0); //pad if leading 00s get truncated
@@ -223,6 +292,9 @@ public class MapGenerator {
 		ArrayList<Byte> header = new ArrayList<Byte>();
 		byte[] bArray = new BigInteger(String.format("%08x%08x",tris.size(),tris.size()*24+8),16).toByteArray();
 		System.out.println(String.format("%08x%08x",15,tris.size()*24+8));
+		
+		floorSize = String.format("%08x", tris.size()*24+8);
+		wallSize = floorSize; //todo - separate walls and floors, set size individually
 
 		
 		//System.out.println(tris.size()/modulus);
