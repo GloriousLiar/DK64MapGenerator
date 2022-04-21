@@ -34,5 +34,5 @@ material_2,,
 (end of file)  
   
 P.S. material_n line entries generate a random color for the FA: G_SETPRIMCOLOR commands.  I suggest you at least include one or else it will not behave correctly, and more than one for contrast purposes.  
-  
-P.P.S. walls collision isn't quite working yet, but it is suggested that you use the walls file regardless so that you don't have to modify the wall file size entry in the header.  
+P.P.S. parser is expecting non-negative whole numbers for vertices, so translate and round accordingly.  
+P.P.P.S. walls collision isn't quite working yet, but it is suggested that you use the walls file regardless so that you don't have to modify the wall file size entry in the header.  
