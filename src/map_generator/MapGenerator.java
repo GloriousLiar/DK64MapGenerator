@@ -257,10 +257,10 @@ public class MapGenerator {
 			Triangle t = tris.get(i);
 			t.setFacingAngle();
 			if(t.isWall) {
-				byte[] wallArray = new BigInteger(String.format("%04x%04x%04x%04x%04x%04x%04x%04x%04x%04x00FF0018",t.x[0],t.y[0],t.z[0], 
+				byte[] wallArray = new BigInteger(String.format("%04x%04x%04x%04x%04x%04x%04x%04x%04x%04x%02xFF0018",t.x[0],t.y[0],t.z[0], 
 						t.x[1],t.y[1],t.z[1], 
 						t.x[2],t.y[2],t.z[2],
-						t.facingAngle),16).toByteArray();
+						t.facingAngle,t.directionBit),16).toByteArray();
 				for(int j=0; j<(24 - wallArray.length); ++j) wallTriBytes.add((byte)0); //pad if leading 00s get truncated
 				for(byte b: wallArray)
 					wallTriBytes.add(b);
@@ -341,6 +341,7 @@ class Triangle {
 	int[] z = new int[3];
 	boolean isWall = false;
 	int facingAngle = 0;
+	int directionBit = 0;
 	public Triangle(int x1, int y1, int z1,
 					int x2, int y2, int z2,
 					int x3, int y3, int z3) {
@@ -360,11 +361,17 @@ class Triangle {
 		if(Math.abs(Math.toDegrees(norm.angle(new Vector3d(0,-1,0)))) < 120.0) {
 			isWall = true;
 		}
+		System.out.println(norm);
 		double angle = Math.toDegrees(Math.atan2(norm.z,norm.x));
 		if(angle < 0) angle += 360.0;
-		System.out.println(angle);
+		if(angle < 180) {
+			angle+=180;
+		}
+		directionBit = (norm.x < 0) ? 1 : 0;
+		System.out.println(isWall+"\n"+angle);
 		
 		int DK64Angle = (int)(angle/360 * 4096);
+		System.out.println(DK64Angle);
 		facingAngle = DK64Angle;
 	}
 }
