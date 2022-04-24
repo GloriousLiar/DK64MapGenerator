@@ -17,9 +17,12 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Scanner;
 
+import javax.vecmath.Vector2d;
+import javax.vecmath.Vector3d;
+
 public class MapGenerator {
-	public static final String fileName = "C:\\Learning\\eclipse-workspace\\DK64MapGenerator\\meshes\\jitb-mesh.csv";
-	public static final String dirOut = "C:\\Users\\Jacob\\Desktop\\Junk-In-The-Box\\";
+	public static final String fileName = "C:\\Learning\\eclipse-workspace\\DK64MapGenerator\\meshes\\SM.csv";
+	public static final String dirOut = "C:\\Users\\Jacob\\Desktop\\Spiral-Mountain\\";
 	
 	public static ArrayList<Vertex> verts;
 	public static ArrayList<Triangle> tris;
@@ -37,7 +40,7 @@ public class MapGenerator {
 		File file = new File(fileName);
 		generateGeometryFileVertices(file);
 		generateGeometryFileFaces(file);
-		generateFloorFile();
+		generateFloorAndWallFiles();
 		generateHeaderAndFooter();
 		generateGeometryFile();
 	}
@@ -245,7 +248,7 @@ public class MapGenerator {
 		fos.close();
 	}
 	
-	public static void generateFloorFile() throws IOException {
+	public static void generateFloorAndWallFiles() throws IOException {
 		ArrayList<Byte> byteList = new ArrayList<>(),
 						byteList2 = new ArrayList<>();
 		/*int next_mesh_pointer=8; //start with 8
@@ -272,16 +275,16 @@ public class MapGenerator {
 			byte[] bArray = new BigInteger(String.format("%04x%04x%04x%04x%04x%04x%04x%04x%04x000001000F70",t.x[0]*6,t.x[1]*6,t.x[2]*6, 
 																											t.y[0]*6,t.y[1]*6,t.y[2]*6, 
 																											t.z[0]*6,t.z[1]*6,t.z[2]*6),16).toByteArray();
-			byte[] bArray2 = new BigInteger(String.format("%04x%04x%04x%04x%04x%04x%04x%04x%04x0000014A07FF",t.x[0],t.x[1],t.x[2], 
-					t.y[0],t.y[1],t.y[2], 
-					t.z[0],t.z[1],t.z[2]),16).toByteArray();
+			byte[] bArray2 = new BigInteger(String.format("%04x%04x%04x%04x%04x%04x%04x%04x%04x000000FF0018",t.x[0],t.y[0],t.z[0], 
+					t.x[1],t.y[1],t.z[1], 
+					t.x[2],t.y[2],t.z[2]),16).toByteArray();
 
 			System.out.println(String.format("f %04x%04x%04x%04x%04x%04x%04x%04x%04x000001000F70",t.x[0]*6,t.x[1]*6,t.x[2]*6, 
 					t.y[0]*6,t.y[1]*6,t.y[2]*6, 
 					t.z[0]*6,t.z[1]*6,t.z[2]*6));
-			System.out.println(String.format("w %04x%04x%04x%04x%04x%04x%04x%04x%04x0000014A07FF",t.x[0],t.x[1],t.x[2], 
-					t.y[0],t.y[1],t.y[2], 
-					t.z[0],t.z[1],t.z[2]));
+			System.out.println(String.format("w %04x%04x%04x%04x%04x%04x%04x%04x%04x000000FF0018",t.x[0],t.y[0],t.z[0], 
+					t.x[1],t.y[1],t.z[1], 
+					t.x[2],t.y[2],t.z[2]));
 			for(int j=0; j<(24 - bArray.length); ++j) byteList.add((byte)0); //pad if leading 00s get truncated
 			for(int j=0; j<(24 - bArray2.length); ++j) byteList2.add((byte)0); //pad if leading 00s get truncated
 			for(byte b: bArray)
@@ -317,6 +320,39 @@ public class MapGenerator {
 		fos.write(data);
 		fos.flush();
 		fos.close();
+		
+		int angleIndex = 26;
+		for(int i=0; i<tris.size(); ++i) {
+			Triangle tri = tris.get(i);
+			Vector3d v1 = new Vector3d(tri.x[1] - tri.x[0],tri.y[1] - tri.y[0],tri.z[1] - tri.z[0]);
+			Vector3d v2 = new Vector3d(tri.x[2] - tri.x[1],tri.y[2] - tri.y[1],tri.z[2] - tri.z[1]);
+			Vector3d cp = new Vector3d(); cp.cross(v1, v2);
+			
+			Vector2d norm = new Vector2d(cp.x,cp.z);
+			norm.normalize();
+			
+			double angle;
+			try {
+				angle = Math.atan(norm.y/norm.x);
+			} catch(Exception e) {
+				angle = 0;
+			}
+			if(norm.x < 0) angle += Math.PI;
+			angle = Math.toDegrees(angle);
+			if(angle < 0) angle += 360.0;
+			if(angle >= 360) angle -= 360.0;
+			System.out.println(angle);
+			
+			int DK64Angle = (int)(angle/360 * 4096);
+			byte[] angleBytes = new BigInteger(String.format("%04x",DK64Angle),16).toByteArray();
+			if(angleBytes.length > 1) {
+				data2[angleIndex] = angleBytes[0];
+				data2[angleIndex+1] = angleBytes[1];
+			} else {
+				data2[angleIndex+1] = angleBytes[0];
+			}
+			angleIndex+=24;
+		}
 		
 		fos2.write(data2);
 		fos2.flush();
