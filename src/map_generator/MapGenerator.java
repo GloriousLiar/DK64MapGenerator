@@ -211,9 +211,9 @@ public class MapGenerator {
 				wallSizeBytes = new BigInteger(wallSize,16).toByteArray(),
 				f3dex2SizeBytes = new BigInteger(String.format("%08x",f3dex2Size+0x140),16).toByteArray(),
 				footerBytes = new BigInteger(String.format("%08x",verts.size()*16+f3dex2Size+0x140),16).toByteArray();
-		int index = 4 - floorSizeBytes.length;
-		for(byte b: floorSizeBytes) header[index++] = b;
-		index = 8 - wallSizeBytes.length;
+		int index = 4 - wallSizeBytes.length;
+		for(byte b: wallSizeBytes) header[index++] = b;
+		index = 8 - floorSizeBytes.length;
 		for(byte b: floorSizeBytes) header[index++] = b;
 		
 		index = 60 - f3dex2SizeBytes.length;
@@ -249,112 +249,70 @@ public class MapGenerator {
 	}
 	
 	public static void generateFloorAndWallFiles() throws IOException {
-		ArrayList<Byte> byteList = new ArrayList<>(),
-						byteList2 = new ArrayList<>();
-		/*int next_mesh_pointer=8; //start with 8
-		int modulus = 16; //number of tris to segment each mesh into
-		int size_of_tri_struct = 24; //size of the triangles in the floors file*/
+		ArrayList<Byte> floorTriBytes = new ArrayList<>(),
+						wallTriBytes = new ArrayList<>();
+		int numWallTris = 0,
+			numFloorTris = 0;
 		for(int i=0; i<tris.size(); ++i) {
-			//every 32 tris, start a new mesh definition
-			/*if(i%modulus == 0) {
-				byte[] meshPtr;
-				if(tris.size() - i < modulus) {
-					meshPtr = new BigInteger(String.format("%08x",next_mesh_pointer+(size_of_tri_struct*(tris.size() - i))),16).toByteArray();
-				} else {
-					meshPtr = new BigInteger(String.format("%08x",next_mesh_pointer+(size_of_tri_struct*modulus)),16).toByteArray();
-					next_mesh_pointer+= size_of_tri_struct*modulus+4;
-				}
-				for(int j=0; j<(4-meshPtr.length); ++j)byteList.add((byte)0);
-				for(int j=0; j<meshPtr.length; ++j) {
-					byteList.add(meshPtr[j]);
-					System.out.print(meshPtr[j]);
-				}
-				System.out.println();
-			}*/
 			Triangle t = tris.get(i);
-			byte[] bArray = new BigInteger(String.format("%04x%04x%04x%04x%04x%04x%04x%04x%04x000001000F70",t.x[0]*6,t.x[1]*6,t.x[2]*6, 
+			t.setFacingAngle();
+			if(t.isWall) {
+				byte[] wallArray = new BigInteger(String.format("%04x%04x%04x%04x%04x%04x%04x%04x%04x%04x00FF0018",t.x[0],t.y[0],t.z[0], 
+						t.x[1],t.y[1],t.z[1], 
+						t.x[2],t.y[2],t.z[2],
+						t.facingAngle),16).toByteArray();
+				for(int j=0; j<(24 - wallArray.length); ++j) wallTriBytes.add((byte)0); //pad if leading 00s get truncated
+				for(byte b: wallArray)
+					wallTriBytes.add(b);
+				System.out.println(String.format("w %04x%04x%04x%04x%04x%04x%04x%04x%04x000000FF0018",t.x[0],t.y[0],t.z[0], 
+						t.x[1],t.y[1],t.z[1], 
+						t.x[2],t.y[2],t.z[2]));
+				numWallTris++;
+			}
+			byte[] floorArray = new BigInteger(String.format("%04x%04x%04x%04x%04x%04x%04x%04x%04x000001000F70",t.x[0]*6,t.x[1]*6,t.x[2]*6, 
 																											t.y[0]*6,t.y[1]*6,t.y[2]*6, 
 																											t.z[0]*6,t.z[1]*6,t.z[2]*6),16).toByteArray();
-			byte[] bArray2 = new BigInteger(String.format("%04x%04x%04x%04x%04x%04x%04x%04x%04x000000FF0018",t.x[0],t.y[0],t.z[0], 
-					t.x[1],t.y[1],t.z[1], 
-					t.x[2],t.y[2],t.z[2]),16).toByteArray();
-
+			for(int j=0; j<(24 - floorArray.length); ++j) floorTriBytes.add((byte)0); //pad if leading 00s get truncated
+			for(byte b: floorArray)
+				floorTriBytes.add(b);
 			System.out.println(String.format("f %04x%04x%04x%04x%04x%04x%04x%04x%04x000001000F70",t.x[0]*6,t.x[1]*6,t.x[2]*6, 
 					t.y[0]*6,t.y[1]*6,t.y[2]*6, 
 					t.z[0]*6,t.z[1]*6,t.z[2]*6));
-			System.out.println(String.format("w %04x%04x%04x%04x%04x%04x%04x%04x%04x000000FF0018",t.x[0],t.y[0],t.z[0], 
-					t.x[1],t.y[1],t.z[1], 
-					t.x[2],t.y[2],t.z[2]));
-			for(int j=0; j<(24 - bArray.length); ++j) byteList.add((byte)0); //pad if leading 00s get truncated
-			for(int j=0; j<(24 - bArray2.length); ++j) byteList2.add((byte)0); //pad if leading 00s get truncated
-			for(byte b: bArray)
-				byteList.add(b);
-			for(byte b: bArray2)
-				byteList2.add(b);
+			numFloorTris++;
 		}
-		ArrayList<Byte> header = new ArrayList<Byte>();
-		byte[] bArray = new BigInteger(String.format("%08x%08x",tris.size(),tris.size()*24+8),16).toByteArray();
-		System.out.println(String.format("%08x%08x",15,tris.size()*24+8));
+		floorSize = String.format("%08x", numFloorTris*24+8);
+		wallSize = String.format("%08x", numWallTris*24+8);
 		
-		floorSize = String.format("%08x", tris.size()*24+8);
-		wallSize = floorSize; //todo - separate walls and floors, set size individually
-
-		
-		//System.out.println(tris.size()/modulus);
-		for(int i=0; i<(8 - bArray.length); ++i) header.add((byte)0); //pad if leading 00s get truncated
-		for(byte b: bArray)
-			header.add(b);
-		for(int i=0; i<header.size(); ++i) {
-			byteList.add(i,header.get(i));
-			byteList2.add(i,header.get(i));
-		}
-		byte[] data = new byte[byteList.size()],
-				data2 = new byte[byteList2.size()];
-		for(int i=0; i<byteList.size(); ++i) data[i] = byteList.get(i).byteValue();
-		for(int i=0; i<byteList2.size(); ++i) data2[i] = byteList2.get(i).byteValue();
+		ArrayList<Byte> floorHeader = new ArrayList<Byte>(),
+						wallHeader = new ArrayList<Byte>();
+		byte[] floorHeaderBytes = new BigInteger(String.format("%08x%08x",numFloorTris,numFloorTris*24+8),16).toByteArray(),
+				wallHeaderBytes = new BigInteger(String.format("%08x%08x",numWallTris,numWallTris*24+8),16).toByteArray();
 		
 		System.out.println("Tris:"+tris.size()+"\nVerts:"+verts.size());
+		System.out.println("Walls: "+numWallTris+"\nFloors: "+numFloorTris);
+		
+		for(int i=0; i<(8 - floorHeaderBytes.length); ++i) floorHeader.add((byte)0); //pad if leading 00s get truncated
+		for(int i=0; i<(8 - wallHeaderBytes.length); ++i) wallHeader.add((byte)0); //pad if leading 00s get truncated
+		for(byte b: floorHeaderBytes)
+			floorHeader.add(b);
+		for(byte b: wallHeaderBytes)
+			wallHeader.add(b);
+		for(int i=0; i<floorHeader.size(); ++i) {
+			floorTriBytes.add(i,floorHeader.get(i));
+			wallTriBytes.add(i,wallHeader.get(i));
+		}
+		byte[] floorData = new byte[floorTriBytes.size()],
+				wallData = new byte[wallTriBytes.size()];
+		for(int i=0; i<floorTriBytes.size(); ++i) floorData[i] = floorTriBytes.get(i).byteValue();
+		for(int i=0; i<wallTriBytes.size(); ++i) wallData[i] = wallTriBytes.get(i).byteValue();
 		
 		FileOutputStream fos = new FileOutputStream(dirOut+"floors.bin"),
-						fos2 = new FileOutputStream(dirOut+"walls.bin") ;
-		fos.write(data);
+				fos2 = new FileOutputStream(dirOut+"walls.bin") ;
+		fos.write(floorData);
 		fos.flush();
 		fos.close();
 		
-		int angleIndex = 26;
-		for(int i=0; i<tris.size(); ++i) {
-			Triangle tri = tris.get(i);
-			Vector3d v1 = new Vector3d(tri.x[1] - tri.x[0],tri.y[1] - tri.y[0],tri.z[1] - tri.z[0]);
-			Vector3d v2 = new Vector3d(tri.x[2] - tri.x[1],tri.y[2] - tri.y[1],tri.z[2] - tri.z[1]);
-			Vector3d cp = new Vector3d(); cp.cross(v1, v2);
-			
-			Vector2d norm = new Vector2d(cp.x,cp.z);
-			norm.normalize();
-			
-			double angle;
-			try {
-				angle = Math.atan(norm.y/norm.x);
-			} catch(Exception e) {
-				angle = 0;
-			}
-			if(norm.x < 0) angle += Math.PI;
-			angle = Math.toDegrees(angle);
-			if(angle < 0) angle += 360.0;
-			if(angle >= 360) angle -= 360.0;
-			System.out.println(angle);
-			
-			int DK64Angle = (int)(angle/360 * 4096);
-			byte[] angleBytes = new BigInteger(String.format("%04x",DK64Angle),16).toByteArray();
-			if(angleBytes.length > 1) {
-				data2[angleIndex] = angleBytes[0];
-				data2[angleIndex+1] = angleBytes[1];
-			} else {
-				data2[angleIndex+1] = angleBytes[0];
-			}
-			angleIndex+=24;
-		}
-		
-		fos2.write(data2);
+		fos2.write(wallData);
 		fos2.flush();
 		fos2.close();
 	}
@@ -381,11 +339,32 @@ class Triangle {
 	int[] x = new int[3];
 	int[] y = new int[3];
 	int[] z = new int[3];
+	boolean isWall = false;
+	int facingAngle = 0;
 	public Triangle(int x1, int y1, int z1,
 					int x2, int y2, int z2,
 					int x3, int y3, int z3) {
 		x[0] = x1; x[1] = x2; x[2] = x3;
 		y[0] = y1; y[1] = y2; y[2] = y3;
 		z[0] = z1; z[1] = z2; z[2] = z3;
+	}
+	
+	public void setFacingAngle() {
+		Vector3d v1 = new Vector3d(x[1] - x[0], y[1] - y[0], z[1] - z[0]);
+		Vector3d v2 = new Vector3d(x[2] - x[1], y[2] - y[1], z[2] - z[1]);
+		Vector3d cp = new Vector3d(); cp.cross(v1, v2);
+		
+		Vector3d norm = new Vector3d(cp.x,cp.y,cp.z);
+		norm.normalize();
+		
+		if(Math.abs(Math.toDegrees(norm.angle(new Vector3d(0,-1,0)))) < 120.0) {
+			isWall = true;
+		}
+		double angle = Math.toDegrees(Math.atan2(norm.z,norm.x));
+		if(angle < 0) angle += 360.0;
+		System.out.println(angle);
+		
+		int DK64Angle = (int)(angle/360 * 4096);
+		facingAngle = DK64Angle;
 	}
 }
