@@ -22,7 +22,7 @@ import javax.vecmath.Vector3d;
 
 public class MapGenerator {
 	public static final String fileName = "C:\\Learning\\eclipse-workspace\\DK64MapGenerator\\meshes\\SM.csv";
-	public static final String dirOut = "C:\\Users\\Jacob\\Desktop\\Spiral-Mountain\\";
+	public static final String dirOut = "C:\\Users\\Jacob\\Desktop\\BK-Mesh\\";
 	
 	public static ArrayList<Vertex> verts;
 	public static ArrayList<Triangle> tris;
@@ -255,7 +255,16 @@ public class MapGenerator {
 			numFloorTris = 0;
 		for(int i=0; i<tris.size(); ++i) {
 			Triangle t = tris.get(i);
+			System.out.println(i);
 			t.setFacingAngle();
+			/*if(t.x[0] == 1179 && t.y[0] == 91 && t.z[0] == 1023) {
+				try{
+					System.out.println(t.x[0]+" "+t.y[0]+" "+t.z[0]+"\n"+
+							t.x[1]+" "+t.y[1]+" "+t.z[1]+"\n"+
+							t.x[2]+" "+t.y[2]+" "+t.z[2]+" ");
+					Thread.sleep(10000);
+				} catch(Exception e) {}
+			}*/
 			if(t.isWall) {
 				byte[] wallArray = new BigInteger(String.format("%04x%04x%04x%04x%04x%04x%04x%04x%04x%04x%02xFF0018",t.x[0],t.y[0],t.z[0], 
 						t.x[1],t.y[1],t.z[1], 
@@ -352,9 +361,9 @@ class Triangle {
 	
 	public void setFacingAngle() {
 		Vector3d v1 = new Vector3d(x[1] - x[0], y[1] - y[0], z[1] - z[0]);
-		Vector3d v2 = new Vector3d(x[2] - x[1], y[2] - y[1], z[2] - z[1]);
+		Vector3d v2 = new Vector3d(x[2] - x[0], y[2] - y[0], z[2] - z[0]);
 		Vector3d cp = new Vector3d(); cp.cross(v1, v2);
-		
+		System.out.println(cp);
 		Vector3d norm = new Vector3d(cp.x,cp.y,cp.z);
 		norm.normalize();
 		
@@ -362,16 +371,19 @@ class Triangle {
 			isWall = true;
 		}
 		System.out.println(norm);
-		double angle = Math.toDegrees(Math.atan2(norm.z,norm.x));
-		if(angle < 0) angle += 360.0;
+		System.out.println(Math.toDegrees(Math.atan2(norm.x, norm.z)));
+		double angle = (Math.toDegrees(Math.atan2(norm.x,norm.z)) + 360) % 360;
 		if(angle < 180) {
 			angle+=180;
+			directionBit = 0;
+		} else {
+			directionBit = 1;
 		}
-		directionBit = (norm.x < 0) ? 1 : 0;
-		System.out.println(isWall+"\n"+angle);
 		
+		//System.out.println("Angle: "+angle);
 		int DK64Angle = (int)(angle/360 * 4096);
-		System.out.println(DK64Angle);
+		System.out.println(isWall+"\n"+angle);
+		//System.out.println(DK64Angle);
 		facingAngle = DK64Angle;
 	}
 }
