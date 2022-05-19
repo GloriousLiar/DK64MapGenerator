@@ -21,8 +21,8 @@ import javax.vecmath.Vector2d;
 import javax.vecmath.Vector3d;
 
 public class MapGenerator {
-	public static final String fileName = "C:\\Learning\\eclipse-workspace\\DK64MapGenerator\\meshes\\SM.csv";
-	public static final String dirOut = "C:\\Users\\Jacob\\Desktop\\BK-Mesh\\";
+	public static final String fileName = "C:\\Learning\\eclipse-workspace\\DK64MapGenerator\\actor-meshes\\note.csv";
+	public static final String dirOut = "C:\\Users\\Jacob\\Desktop\\actor-test\\note\\";
 	
 	public static ArrayList<Vertex> verts;
 	public static ArrayList<Triangle> tris;
@@ -37,12 +37,21 @@ public class MapGenerator {
 	public static int f3dex2Size;
 	
 	public static void main(String[] args) throws IOException, FileNotFoundException {
+		/* Uncomment for level geometry
+		 
 		File file = new File(fileName);
 		generateGeometryFileVertices(file);
 		generateGeometryFileFaces(file);
 		generateFloorAndWallFiles();
 		generateHeaderAndFooter();
-		generateGeometryFile();
+		generateGeometryFile();*/
+		
+		File file = new File(fileName);
+		ModelGenerator.dirOut = dirOut;
+		ModelGenerator.generateGeometryFileVertices(file);
+		ModelGenerator.generateGeometryFileFaces(file);
+		ModelGenerator.generateHeaderAndFooter();
+		ModelGenerator.generateGeometryFile();
 	}
 
 	public static void generateGeometryFileVertices(File f) throws IOException {
@@ -363,22 +372,18 @@ class Triangle {
 		Vector3d v1 = new Vector3d(x[1] - x[0], y[1] - y[0], z[1] - z[0]);
 		Vector3d v2 = new Vector3d(x[2] - x[0], y[2] - y[0], z[2] - z[0]);
 		Vector3d cp = new Vector3d(); cp.cross(v1, v2);
-		System.out.println(cp);
+		//System.out.println(cp);
 		Vector3d norm = new Vector3d(cp.x,cp.y,cp.z);
 		norm.normalize();
 		
-		if(Math.abs(Math.toDegrees(norm.angle(new Vector3d(0,-1,0)))) < 120.0) {
+		if(Math.toDegrees(norm.angle(new Vector3d(0,1,0))) < 125.0 &&
+				Math.toDegrees(norm.angle(new Vector3d(0,1,0))) > 55.0) {
 			isWall = true;
 		}
 		System.out.println(norm);
-		System.out.println(Math.toDegrees(Math.atan2(norm.x, norm.z)));
+		//System.out.println(Math.toDegrees(Math.atan2(norm.x, norm.z)));
 		double angle = (Math.toDegrees(Math.atan2(norm.x,norm.z)) + 360) % 360;
-		if(angle < 180) {
-			angle+=180;
-			directionBit = 0;
-		} else {
-			directionBit = 1;
-		}
+		directionBit = 1;
 		
 		//System.out.println("Angle: "+angle);
 		int DK64Angle = (int)(angle/360 * 4096);
