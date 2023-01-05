@@ -21,8 +21,8 @@ import javax.vecmath.Vector2d;
 import javax.vecmath.Vector3d;
 
 public class MapGenerator {
-	public static final String fileName = "C:\\Learning\\eclipse-workspace\\DK64MapGenerator\\actor-meshes\\note.csv";
-	public static final String dirOut = "C:\\Users\\Jacob\\Desktop\\actor-test\\note\\";
+	public static final String fileName = "E:\\dev\\eclipse\\DK64MapGenerator\\blender-output\\model_sm.c";
+	public static final String dirOut = "C:\\Users\\Jacob\\Desktop\\Spiral\\";
 	
 	public static ArrayList<Vertex> verts;
 	public static ArrayList<Triangle> tris;
@@ -36,6 +36,18 @@ public class MapGenerator {
 	
 	public static int f3dex2Size;
 	
+	
+	//blender stuff
+	public static ArrayList<String> vtxSegments,
+									triSegments,
+									materialSegments,
+									imageSegments;
+	
+	public static Map<String,Integer> vertexBlocks;
+	
+	public static String mesh_name = "spiral_mountain_export";
+	
+	
 	public static void main(String[] args) throws IOException, FileNotFoundException {
 		/* Uncomment for level geometry
 		 
@@ -46,14 +58,264 @@ public class MapGenerator {
 		generateHeaderAndFooter();
 		generateGeometryFile();*/
 		
-		File file = new File(fileName);
+		/*File file = new File(fileName);
 		ModelGenerator.dirOut = dirOut;
 		ModelGenerator.generateGeometryFileVertices(file);
 		ModelGenerator.generateGeometryFileFaces(file);
 		ModelGenerator.generateHeaderAndFooter();
-		ModelGenerator.generateGeometryFile();
+		ModelGenerator.generateGeometryFile();*/
+		
+		File file = new File(fileName);
+		parseGfx(file);
+		parseImages();
+		parseVertices();
+		translateVerticesToPositiveXZ();
+		parseFaces();
+		generateFloorAndWallFiles();
+		rebuildFile();
 	}
 
+	public static void parseGfx(File f) throws IOException {
+		Scanner scan = new Scanner(f);
+		String whole_file = "";
+		while(scan.hasNextLine()) {
+			whole_file+=scan.nextLine();
+		}
+		String[] segments = whole_file.split(";");
+		//System.out.println(segments.length);
+		
+		vtxSegments = new ArrayList<String>();
+		triSegments = new ArrayList<String>();
+		materialSegments = new ArrayList<String>();
+		imageSegments = new ArrayList<String>();
+		for(String s: segments) {
+			if(s.contains("cull") || s.contains("Cull")) continue;
+			if(s.contains("Gfx")) {
+				if(s.contains("revert") || s.contains("Revert")) continue;
+				else if(s.contains("tri_")) {
+					triSegments.add(s);
+				} else if(s.contains("mat")) {
+					materialSegments.add(s);
+				}
+			} else if(s.contains("Vtx")){
+				vtxSegments.add(s);
+			} else {
+				imageSegments.add(s);
+			}
+		}
+		
+		//find material_null
+		int null_index=-1;
+		for(int i=0; i<materialSegments.size(); ++i) {
+			if(materialSegments.get(i).contains("material_null")) {
+				null_index = i;
+				break;
+			}
+		}
+		materialSegments.remove(null_index);
+		vtxSegments.remove(null_index);
+		triSegments.remove(null_index);
+	}
+	
+	public static void parseImages() throws IOException {
+		FileOutputStream fos = new FileOutputStream(dirOut+"build_imports.txt");
+		String out = "";
+		int index = 6013; //first unused index in texture table
+		for(String s: imageSegments) {
+			int 	start = s.indexOf(mesh_name) + mesh_name.length() + 1,
+					end = 	s.indexOf("_rgba16");
+			while(s.substring(start).startsWith("_")) start++;
+			
+			out+= "\t{\n"+
+					"\t\t\"name\": \""+s.substring(start,end)+"\",\n" +
+					"\t\t\"pointer_table_index\": 25,\n" +
+					"\t\t\"file_index\": "+(index++)+",\n" +
+					"\t\t\"source_file\": \"bin/"+s.substring(start,end)+".png\",\n" +
+					"\t\t\"texture_format\": \"rgba5551\"\n" +
+				  "\t},\n";
+		}
+		fos.write(out.getBytes());
+		fos.flush();
+		fos.close();
+	}
+	
+	public static void parseVertices() throws IOException {
+		vertexBlocks = new HashMap<String,Integer>();
+		verts = new ArrayList<Vertex>();
+		int cumulative_vertices=0;
+		for(String segment: vtxSegments) {
+			//get name for map
+			int start = segment.indexOf("Vtx")+4;
+			int end = segment.indexOf("[");
+			vertexBlocks.put(segment.substring(start,end), cumulative_vertices);
+			//System.out.println(segment.substring(start,end)+" "+cumulative_vertices);
+			
+			segment = segment.substring(segment.indexOf("{")+1);
+			while(segment.contains("{{ {")) {
+				start = segment.indexOf("{{ {");
+				end = segment.indexOf("} }},");
+				String[] vtx_n = segment.substring(start,end).split("[\\{\\}\\s,]+");
+				
+				verts.add(new Vertex(	Integer.parseInt(vtx_n[1]),
+										Integer.parseInt(vtx_n[2]),
+										Integer.parseInt(vtx_n[3])));
+				segment = segment.substring(end+5);
+				cumulative_vertices++;
+			}
+		}
+	}
+
+	public static void translateVerticesToPositiveXZ() throws IOException {
+		int min_x=Integer.MAX_VALUE, min_z=Integer.MAX_VALUE;
+		for(Vertex v: verts) {
+			if(v.x < min_x) min_x = v.x;
+			if(v.z < min_z) min_z = v.z;
+		}
+		if(min_x >= 0 && min_z >= 0) return; //already +XZ
+		System.out.println("MINS: "+min_x+" "+min_z);
+		
+		//update the vert blocks in the model.c file
+		ArrayList<String> newSegments = new ArrayList<String>();
+		for(String segment: vtxSegments) {
+			ArrayList<Integer> 	starts = new ArrayList<Integer>(),
+								ends = new ArrayList<Integer>();
+			for(int index = segment.indexOf("{{ {"); index >= 0; index = segment.indexOf("{{ {", index+1)) {
+				starts.add(index);
+				ends.add(segment.indexOf("},",index));
+				System.out.println(index+" "+segment.indexOf("},",index));
+			}
+			
+			ArrayList<String> new_vtxs = new ArrayList<String>();
+			String new_vtx = "";
+			String temp = "";
+			for(int i=0; i< starts.size(); ++i) {
+				temp = segment.substring(starts.get(i),ends.get(i)); //get each vtx
+				System.out.println(temp);
+				String[] numbers = temp.split("[\\{\\}\\s,]+");
+				int a = Integer.parseInt(numbers[1]),
+					b = Integer.parseInt(numbers[2]),
+					c = Integer.parseInt(numbers[3]);
+				new_vtx = 	"{{ {" +
+							(a + (-min_x)) + ", " +
+							b + ", " +
+							(c + (-min_z));
+				new_vtxs.add(new_vtx);
+				System.out.println(a+" "+b+" "+c);
+				System.out.println((a+(-min_x))+" "+b+" "+(c+(-min_z)));
+			}
+			temp = segment.substring(0,starts.get(0));
+			for(int i=0; i< starts.size(); ++i) {
+				if(i+1 < starts.size()) {
+					temp += new_vtxs.get(i) + segment.substring(ends.get(i),starts.get(i+1));
+				} else {
+					temp += new_vtxs.get(i) + segment.substring(ends.get(i));
+				}
+			}
+			//System.out.println(segment);
+			//System.out.println(temp);
+			newSegments.add(temp);
+		}
+		vtxSegments = newSegments;
+		
+		//update the verts list
+		ArrayList<Vertex> new_verts = new ArrayList<Vertex>();
+		for(int i=0; i< verts.size(); ++i) {
+			Vertex v = verts.get(i);
+			new_verts.add(new Vertex(v.x + (-min_x), v.y, v.z + (-min_z)));
+		}
+		verts = new_verts;
+	}
+	
+	public static void parseFaces() throws IOException {
+		tris = new ArrayList<Triangle>();
+		for(String segment:triSegments) {
+			String[] tri_commands = segment.split("\\),");
+			int vert_start_index = 0;
+			for(String command : tri_commands) {
+				if(command.contains("Vertex")) {
+					int start = command.indexOf("gsSPVertex(");
+					int end = command.indexOf("+");
+					String vert_block_name = command.substring(start+11,end).trim();
+					vert_start_index = vertexBlocks.get(vert_block_name);
+					
+					command = command.substring(end+1);
+					vert_start_index += Integer.parseInt(command.substring(0,command.indexOf(",")).trim());
+				} else if(command.contains("Triangle")) {
+					String[] indices = command.split("[\\\\(\\\\)\\\\s,]+");
+					if(command.contains("Triangles")) { //2 tris command
+						Vertex 	v1 = verts.get(Integer.parseInt(indices[2].trim()) + vert_start_index),
+								v2 = verts.get(Integer.parseInt(indices[3].trim()) + vert_start_index),
+								v3 = verts.get(Integer.parseInt(indices[4].trim()) + vert_start_index);
+						tris.add(new Triangle(	v1.x,v1.y,v1.z,
+												v2.x,v2.y,v2.z,
+												v3.x,v3.y,v3.z));
+								v1 = verts.get(Integer.parseInt(indices[6].trim()) + vert_start_index);
+								v2 = verts.get(Integer.parseInt(indices[7].trim()) + vert_start_index);
+								v3 = verts.get(Integer.parseInt(indices[8].trim()) + vert_start_index);
+						tris.add(new Triangle(	v1.x,v1.y,v1.z,
+												v2.x,v2.y,v2.z,
+												v3.x,v3.y,v3.z));
+					} else { //1 tri command
+						Vertex 	v1 = verts.get(Integer.parseInt(indices[2].trim()) + vert_start_index),
+								v2 = verts.get(Integer.parseInt(indices[3].trim()) + vert_start_index),
+								v3 = verts.get(Integer.parseInt(indices[4].trim()) + vert_start_index);
+						tris.add(new Triangle(	v1.x,v1.y,v1.z,
+												v2.x,v2.y,v2.z,
+												v3.x,v3.y,v3.z));
+					}
+				} else {
+					continue; //should only get here for end display list command
+				}
+			}
+		}
+	}
+	
+	public static void rebuildFile() throws IOException {
+		FileOutputStream fos = new FileOutputStream(dirOut+"model.c");
+		String out = "#include <ultra64.h>\n#include \"header.h\"\n";
+		for(String s: vtxSegments) out+=s+";\n";
+		
+		int cumulative_verts = 0;
+		for(int i=0; i<materialSegments.size(); ++i) {
+			String 	material = materialSegments.get(i),
+					tris = triSegments.get(i);
+			String triOut = cleanTriBlock(tris, cumulative_verts);
+			cumulative_verts = Integer.parseInt(triOut.substring(triOut.indexOf("***")+3));
+			triOut= triOut.substring(0,triOut.indexOf("***"));
+			//System.out.println(cumulative_verts);
+			out+= 	cleanMaterial(material,(6013+i)) + ";\n" +
+					triOut + ";\n";
+		}
+		while(out.contains("gsSPEndDisplayList")) out = out.replace("gsSPEndDisplayList(),", "");
+		fos.write(out.getBytes());
+		fos.flush();
+		fos.close();
+	}
+	
+	public static String cleanMaterial(String mat, int index) {
+		int 	start = mat.lastIndexOf(mesh_name),
+				end = mat.indexOf("_rgba16") + 7;
+		return mat.substring(0,start)+index+mat.substring(end);
+	}
+	
+	public static String cleanTriBlock(String tris, int verts) {
+		String[] vertexDLs = tris.split(mesh_name);
+		String ret = "";
+		for(int i=1; i<vertexDLs.length; ++i) {
+			if(i==1) {
+				ret += vertexDLs[0] + mesh_name + vertexDLs[1];
+				continue;
+			}
+			ret += 	"0x0" + Integer.toHexString(0x06000000 + verts * 0x10) +
+					vertexDLs[i].substring(vertexDLs[i].indexOf(","));
+			String vert_string = vertexDLs[i].substring(vertexDLs[i].indexOf(",")+1);
+			vert_string = vert_string.substring(0, vert_string.indexOf(","));
+			verts+=Integer.parseInt(vert_string.trim());
+			//System.out.println(vert_string+" "+verts);
+		}
+		return ret+"***"+verts;
+	}
+	
 	public static void generateGeometryFileVertices(File f) throws IOException {
 		ArrayList<Byte> byteList = new ArrayList<>();
 		ArrayList<Vertex> points = new ArrayList<>();
@@ -264,38 +526,60 @@ public class MapGenerator {
 			numFloorTris = 0;
 		for(int i=0; i<tris.size(); ++i) {
 			Triangle t = tris.get(i);
-			System.out.println(i);
+			System.out.println("Tri "+i+": "+t.x[0]+" "+t.y[0]+" "+t.z[0]+" "
+											+t.x[1]+" "+t.y[1]+" "+t.z[1]+" "
+											+t.x[2]+" "+t.y[2]+" "+t.z[2]+" ");
+			//System.out.println(i);
 			t.setFacingAngle();
-			/*if(t.x[0] == 1179 && t.y[0] == 91 && t.z[0] == 1023) {
-				try{
-					System.out.println(t.x[0]+" "+t.y[0]+" "+t.z[0]+"\n"+
-							t.x[1]+" "+t.y[1]+" "+t.z[1]+"\n"+
-							t.x[2]+" "+t.y[2]+" "+t.z[2]+" ");
-					Thread.sleep(10000);
-				} catch(Exception e) {}
-			}*/
 			if(t.isWall) {
-				byte[] wallArray = new BigInteger(String.format("%04x%04x%04x%04x%04x%04x%04x%04x%04x%04x%02xFF0018",t.x[0],t.y[0],t.z[0], 
-						t.x[1],t.y[1],t.z[1], 
-						t.x[2],t.y[2],t.z[2],
+				byte[] wallArray = new BigInteger(String.format("%04x%04x%04x%04x%04x%04x%04x%04x%04x%04x%02xFF0018",t.x[0] & 0xFFFF,t.y[0] & 0xFFFF,t.z[0] & 0xFFFF, 
+						t.x[1] & 0xFFFF,t.y[1] & 0xFFFF,t.z[1] & 0xFFFF, 
+						t.x[2] & 0xFFFF,t.y[2] & 0xFFFF,t.z[2] & 0xFFFF,
 						t.facingAngle,t.directionBit),16).toByteArray();
+				if(t.x[0] < 1) {//special case where string format adds leading 0 to first negative number.. so chop it off
+					wallArray = new BigInteger(String.format("%04x%04x%04x%04x%04x%04x%04x%04x%04x%04x%02xFF0018",t.x[0] & 0xFFFF,t.y[0] & 0xFFFF,t.z[0] & 0xFFFF, 
+						t.x[1] & 0xFFFF,t.y[1] & 0xFFFF,t.z[1] & 0xFFFF, 
+						t.x[2] & 0xFFFF,t.y[2] & 0xFFFF,t.z[2] & 0xFFFF,
+						t.facingAngle,t.directionBit),16).toByteArray();
+					
+					byte[] tmp = new byte[wallArray.length-1];
+					for(int k=1; k<wallArray.length; ++k) tmp[k-1] = wallArray[k];
+					wallArray = tmp;
+				}
 				for(int j=0; j<(24 - wallArray.length); ++j) wallTriBytes.add((byte)0); //pad if leading 00s get truncated
-				for(byte b: wallArray)
+				for(byte b: wallArray) {
 					wallTriBytes.add(b);
-				System.out.println(String.format("w %04x%04x%04x%04x%04x%04x%04x%04x%04x000000FF0018",t.x[0],t.y[0],t.z[0], 
-						t.x[1],t.y[1],t.z[1], 
-						t.x[2],t.y[2],t.z[2]));
+					System.out.printf("%02x",b);
+				}
+				System.out.println();
+				System.out.println(String.format("w %04x%04x%04x%04x%04x%04x%04x%04x%04x%04x%02xFF0018",t.x[0] & 0xFFFF,t.y[0] & 0xFFFF,t.z[0] & 0xFFFF, 
+						t.x[1] & 0xFFFF,t.y[1] & 0xFFFF,t.z[1] & 0xFFFF, 
+						t.x[2] & 0xFFFF,t.y[2] & 0xFFFF,t.z[2] & 0xFFFF,
+						t.facingAngle,t.directionBit));
 				numWallTris++;
+				if(wallTriBytes.size() % 2 != 0) System.out.println("bad");
 			}
-			byte[] floorArray = new BigInteger(String.format("%04x%04x%04x%04x%04x%04x%04x%04x%04x000001000F70",t.x[0]*6,t.x[1]*6,t.x[2]*6, 
-																											t.y[0]*6,t.y[1]*6,t.y[2]*6, 
-																											t.z[0]*6,t.z[1]*6,t.z[2]*6),16).toByteArray();
+			byte[] floorArray = new BigInteger(String.format("%04x%04x%04x%04x%04x%04x%04x%04x%04x000001000F70",(t.x[0]*6) & 0xFFFF,(t.x[1]*6) & 0xFFFF,(t.x[2]*6) & 0xFFFF, 
+					(t.y[0]*6) & 0xFFFF,(t.y[1]*6) & 0xFFFF,(t.y[2]*6) & 0xFFFF, 
+					(t.z[0]*6) & 0xFFFF,(t.z[1]*6) & 0xFFFF,(t.z[2]*6) & 0xFFFF),16).toByteArray();
+			
+			if(t.x[0] < 0) {//special case where string format adds leading 0 to first negative number.. so chop it off
+				floorArray = new BigInteger(String.format("%04x%04x%04x%04x%04x%04x%04x%04x%04x000001000F70",(t.x[0]*6) & 0xFFFF,(t.x[1]*6) & 0xFFFF,(t.x[2]*6) & 0xFFFF, 
+						(t.y[0]*6) & 0xFFFF,(t.y[1]*6) & 0xFFFF,(t.y[2]*6) & 0xFFFF, 
+						(t.z[0]*6) & 0xFFFF,(t.z[1]*6) & 0xFFFF,(t.z[2]*6) & 0xFFFF),16).toByteArray();
+				byte[] tmp = new byte[floorArray.length-1];
+				for(int k=1; k<floorArray.length; ++k) tmp[k-1] = floorArray[k];
+				floorArray = tmp;
+			}
 			for(int j=0; j<(24 - floorArray.length); ++j) floorTriBytes.add((byte)0); //pad if leading 00s get truncated
-			for(byte b: floorArray)
+			for(byte b: floorArray) {
 				floorTriBytes.add(b);
-			System.out.println(String.format("f %04x%04x%04x%04x%04x%04x%04x%04x%04x000001000F70",t.x[0]*6,t.x[1]*6,t.x[2]*6, 
-					t.y[0]*6,t.y[1]*6,t.y[2]*6, 
-					t.z[0]*6,t.z[1]*6,t.z[2]*6));
+				System.out.printf("%02x",b);
+			}
+			System.out.println();
+			System.out.println(String.format("f %04x%04x%04x%04x%04x%04x%04x%04x%04x000001000F70",t.x[0]*6 & 0xFFFF,t.x[1]*6 & 0xFFFF,t.x[2]*6 & 0xFFFF, 
+					t.y[0]*6 & 0xFFFF,t.y[1]*6 & 0xFFFF,t.y[2]*6 & 0xFFFF, 
+					t.z[0]*6 & 0xFFFF,t.z[1]*6 & 0xFFFF,t.z[2]*6 & 0xFFFF));
 			numFloorTris++;
 		}
 		floorSize = String.format("%08x", numFloorTris*24+8);
@@ -380,14 +664,14 @@ class Triangle {
 				Math.toDegrees(norm.angle(new Vector3d(0,1,0))) > 55.0) {
 			isWall = true;
 		}
-		System.out.println(norm);
+		//System.out.println(norm);
 		//System.out.println(Math.toDegrees(Math.atan2(norm.x, norm.z)));
 		double angle = (Math.toDegrees(Math.atan2(norm.x,norm.z)) + 360) % 360;
 		directionBit = 1;
 		
 		//System.out.println("Angle: "+angle);
 		int DK64Angle = (int)(angle/360 * 4096);
-		System.out.println(isWall+"\n"+angle);
+		//System.out.println(isWall+"\n"+angle);
 		//System.out.println(DK64Angle);
 		facingAngle = DK64Angle;
 	}
