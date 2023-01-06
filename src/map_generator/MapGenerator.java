@@ -21,8 +21,8 @@ import javax.vecmath.Vector2d;
 import javax.vecmath.Vector3d;
 
 public class MapGenerator {
-	public static final String fileName = "E:\\dev\\eclipse\\DK64MapGenerator\\blender-output\\model_sm.c";
-	public static final String dirOut = "C:\\Users\\Jacob\\Desktop\\Spiral\\";
+	public static final String fileName = "E:\\dev\\eclipse\\DK64MapGenerator\\blender-output\\model_sm_w_ci4.c";
+	public static final String dirOut = "C:\\Users\\Jacob\\Desktop\\spiral2\\";
 	
 	public static ArrayList<Vertex> verts;
 	public static ArrayList<Triangle> tris;
@@ -68,11 +68,11 @@ public class MapGenerator {
 		File file = new File(fileName);
 		parseGfx(file);
 		parseImages();
-		parseVertices();
-		translateVerticesToPositiveXZ();
-		parseFaces();
-		generateFloorAndWallFiles();
-		rebuildFile();
+		//parseVertices();
+		//translateVerticesToPositiveXZ();
+		//parseFaces();
+		//generateFloorAndWallFiles();
+		//rebuildFile();
 	}
 
 	public static void parseGfx(File f) throws IOException {
@@ -118,25 +118,87 @@ public class MapGenerator {
 	}
 	
 	public static void parseImages() throws IOException {
+		Files.createDirectories(Paths.get(dirOut+"/textures"));
+		
 		FileOutputStream fos = new FileOutputStream(dirOut+"build_imports.txt");
 		String out = "";
 		int index = 6013; //first unused index in texture table
 		for(String s: imageSegments) {
-			int 	start = s.indexOf(mesh_name) + mesh_name.length() + 1,
-					end = 	s.indexOf("_rgba16");
-			while(s.substring(start).startsWith("_")) start++;
-			
-			out+= "\t{\n"+
-					"\t\t\"name\": \""+s.substring(start,end)+"\",\n" +
-					"\t\t\"pointer_table_index\": 25,\n" +
-					"\t\t\"file_index\": "+(index++)+",\n" +
-					"\t\t\"source_file\": \"bin/"+s.substring(start,end)+".png\",\n" +
-					"\t\t\"texture_format\": \"rgba5551\"\n" +
-				  "\t},\n";
+			if(s.contains("_ci4_pal_") || s.contains("_ci4[]")) { //c14 and/or pallette
+				int 	start = s.indexOf(mesh_name) + mesh_name.length() + 1,
+						end = 	s.indexOf("_ci4");
+				while(s.substring(start).startsWith("_")) start++;
+				
+				boolean pallette = s.contains("ci4_pal");
+				String 	format = pallette ? "rgba5551" : "ia4",
+						name = pallette ? "_pal" : "";
+				
+				out+= "\t{\n"+
+						"\t\t\"name\": \""+s.substring(start,end)+name+"\",\n" +
+						"\t\t\"pointer_table_index\": 25,\n" +
+						"\t\t\"file_index\": "+(index++)+",\n" +
+						"\t\t\"source_file\": \"bin/"+s.substring(start,end)+name+".bin\",\n" +
+						"\t\t\"do_not_extract\": True\n" +
+					  "\t},\n";
+				
+				exportImage(s, s.substring(start,end)+name);
+			} else { //rgba16
+				int 	start = s.indexOf(mesh_name) + mesh_name.length() + 1,
+						end = 	s.indexOf("_rgba16");
+				while(s.substring(start).startsWith("_")) start++;
+				
+				out+= "\t{\n"+
+						"\t\t\"name\": \""+s.substring(start,end)+"\",\n" +
+						"\t\t\"pointer_table_index\": 25,\n" +
+						"\t\t\"file_index\": "+(index++)+",\n" +
+						"\t\t\"source_file\": \"bin/"+s.substring(start,end)+".bin\",\n" +
+						"\t\t\"texture_format\": \"rgba5551\"\n" +
+					  "\t},\n";
+				
+				exportImage(s, s.substring(start,end));
+			}
 		}
 		fos.write(out.getBytes());
 		fos.flush();
 		fos.close();
+	}
+	
+	public static void exportImage(String imageSegment, String name) throws IOException{
+		FileOutputStream fos = new FileOutputStream(dirOut+"textures\\"+name+".bin");
+		
+		String[] imageBytes = imageSegment.split("[{},]");
+		for(String s: imageBytes) System.out.print(s+"*");
+		System.out.println();
+		//System.out.println(imageSegment);
+		
+		int bytes = 0;
+		for(int i=1; i<imageBytes.length; ++i) {
+			if(!imageBytes[i].contains("0x")) continue;
+			String hex = imageBytes[i].substring(imageBytes[i].indexOf("0x")+2).trim();
+			byte[] bArray = new byte[8];
+			for(int j=0; j<hex.length(); j+=2) {
+				bArray[j/2] = (byte) ((Character.digit(hex.charAt(j), 16) << 4) + Character.digit(hex.charAt(j+1), 16));
+			}
+			fos.write(bArray);
+			
+			//if(!imageBytes[i].contains("0x")) continue;
+			//System.out.println(imageBytes[i].substring(imageBytes[i].indexOf("0x")+2).trim());
+			//String hex = imageBytes[i].substring(imageBytes[i].indexOf("0x")+2).trim();
+			//fos.write(new BigInteger(hex,16).toByteArray());
+			//bytes += new BigInteger(hex,16).toByteArray().length;
+			//System.out.println(bytes);
+			//for(byte b: new BigInteger(hex,16).toByteArray()) System.out.print(b+" ");
+			//System.out.println();
+			//if(new BigInteger(hex,16).toByteArray().length != 8) {
+			//	System.out.println("bad"+new BigInteger(hex,16).toByteArray().length);
+			//	System.out.println(hex);
+			//	for(byte b: new BigInteger(hex,16).toByteArray()) System.out.print(b+" ");
+			//	System.out.println();
+			//}
+		}
+		
+		fos.flush();
+		fos.close();		
 	}
 	
 	public static void parseVertices() throws IOException {
@@ -276,6 +338,7 @@ public class MapGenerator {
 		for(String s: vtxSegments) out+=s+";\n";
 		
 		int cumulative_verts = 0;
+		int pallette_index_modifier=0;
 		for(int i=0; i<materialSegments.size(); ++i) {
 			String 	material = materialSegments.get(i),
 					tris = triSegments.get(i);
@@ -283,8 +346,11 @@ public class MapGenerator {
 			cumulative_verts = Integer.parseInt(triOut.substring(triOut.indexOf("***")+3));
 			triOut= triOut.substring(0,triOut.indexOf("***"));
 			//System.out.println(cumulative_verts);
-			out+= 	cleanMaterial(material,(6013+i)) + ";\n" +
+			out+= 	cleanMaterial(material,(6013+i+pallette_index_modifier)) + ";\n" +
 					triOut + ";\n";
+			
+			if(material.contains("ci4_pal")) //materials with a pallette take up 2 indices, so increment the index modifier
+				pallette_index_modifier++;
 		}
 		while(out.contains("gsSPEndDisplayList")) out = out.replace("gsSPEndDisplayList(),", "");
 		fos.write(out.getBytes());
@@ -293,9 +359,24 @@ public class MapGenerator {
 	}
 	
 	public static String cleanMaterial(String mat, int index) {
-		int 	start = mat.lastIndexOf(mesh_name),
-				end = mat.indexOf("_rgba16") + 7;
-		return mat.substring(0,start)+index+mat.substring(end);
+		if(mat.contains("ci4_pal")) {
+			ArrayList<Integer> image_indices = new ArrayList<Integer>();
+			for(int i = mat.indexOf(mesh_name); i>=0; i=mat.indexOf(mesh_name, i+1)) {
+				image_indices.add(i);
+			}
+			
+			int pallette_start = image_indices.get(1), //pallette is second mesh_name reference after variable name
+				pallette_end = mat.indexOf("ci4_pal_rgba16") + 14;
+			int	image_start = image_indices.get(2), //image is third mesh_name reference
+				image_end = mat.indexOf("_ci4)") + 4;
+			
+			//pallette index is after image index
+			return mat.substring(0,pallette_start)+(index+1)+mat.substring(pallette_end,image_start)+index+mat.substring(image_end);
+		} else { //rgba16
+			int 	start = mat.lastIndexOf(mesh_name),
+					end = mat.indexOf("_rgba16") + 7;
+			return mat.substring(0,start)+index+mat.substring(end);
+		}
 	}
 	
 	public static String cleanTriBlock(String tris, int verts) {
