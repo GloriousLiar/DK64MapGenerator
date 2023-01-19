@@ -21,8 +21,8 @@ import javax.vecmath.Vector2d;
 import javax.vecmath.Vector3d;
 
 public class MapGenerator {
-	public static final String fileName = "E:\\dev\\eclipse\\DK64MapGenerator\\blender-output\\model_sm_w_ci4.c";
-	public static final String dirOut = "C:\\Users\\Jacob\\Desktop\\spiral2\\";
+	public static final String fileName = "E:\\dev\\eclipse\\DK64MapGenerator\\blender-output\\model_tdl_tooie.c";
+	public static final String dirOut = "C:\\Users\\Jacob\\Desktop\\TDL\\";
 	
 	public static ArrayList<Vertex> verts;
 	public static ArrayList<Triangle> tris;
@@ -45,7 +45,11 @@ public class MapGenerator {
 	
 	public static Map<String,Integer> vertexBlocks;
 	
-	public static String mesh_name = "spiral_mountain_export";
+	public static String mesh_name = "tdl_updated";
+	
+	//first unused index in texture table = 6013
+	//if creating multiple maps, increment by number of textures already used to prevent collisions
+	public static int texture_index = 6013;
 	
 	
 	public static void main(String[] args) throws IOException, FileNotFoundException {
@@ -68,11 +72,11 @@ public class MapGenerator {
 		File file = new File(fileName);
 		parseGfx(file);
 		parseImages();
-		//parseVertices();
-		//translateVerticesToPositiveXZ();
-		//parseFaces();
-		//generateFloorAndWallFiles();
-		//rebuildFile();
+		parseVertices();
+		translateVerticesToPositiveXYZ();
+		parseFaces();
+		generateFloorAndWallFiles();
+		rebuildFile();
 	}
 
 	public static void parseGfx(File f) throws IOException {
@@ -112,6 +116,7 @@ public class MapGenerator {
 				break;
 			}
 		}
+		if(null_index < 0) return;
 		materialSegments.remove(null_index);
 		vtxSegments.remove(null_index);
 		triSegments.remove(null_index);
@@ -119,10 +124,11 @@ public class MapGenerator {
 	
 	public static void parseImages() throws IOException {
 		Files.createDirectories(Paths.get(dirOut+"/textures"));
+		Files.createDirectories(Paths.get(dirOut+"/textures/"+mesh_name));
 		
 		FileOutputStream fos = new FileOutputStream(dirOut+"build_imports.txt");
 		String out = "";
-		int index = 6013; //first unused index in texture table
+		
 		for(String s: imageSegments) {
 			if(s.contains("_ci4_pal_") || s.contains("_ci4[]")) { //c14 and/or pallette
 				int 	start = s.indexOf(mesh_name) + mesh_name.length() + 1,
@@ -136,8 +142,8 @@ public class MapGenerator {
 				out+= "\t{\n"+
 						"\t\t\"name\": \""+s.substring(start,end)+name+"\",\n" +
 						"\t\t\"pointer_table_index\": 25,\n" +
-						"\t\t\"file_index\": "+(index++)+",\n" +
-						"\t\t\"source_file\": \"bin/"+s.substring(start,end)+name+".bin\",\n" +
+						"\t\t\"file_index\": "+(texture_index++)+",\n" +
+						"\t\t\"source_file\": \"bin/"+mesh_name+"/"+s.substring(start,end)+name+".bin\",\n" +
 						"\t\t\"do_not_extract\": True\n" +
 					  "\t},\n";
 				
@@ -150,9 +156,9 @@ public class MapGenerator {
 				out+= "\t{\n"+
 						"\t\t\"name\": \""+s.substring(start,end)+"\",\n" +
 						"\t\t\"pointer_table_index\": 25,\n" +
-						"\t\t\"file_index\": "+(index++)+",\n" +
-						"\t\t\"source_file\": \"bin/"+s.substring(start,end)+".bin\",\n" +
-						"\t\t\"texture_format\": \"rgba5551\"\n" +
+						"\t\t\"file_index\": "+(texture_index++)+",\n" +
+						"\t\t\"source_file\": \"bin/"+mesh_name+"/"+s.substring(start,end)+".bin\",\n" +
+						"\t\t\"do_not_extract\": True\n" +
 					  "\t},\n";
 				
 				exportImage(s, s.substring(start,end));
@@ -164,11 +170,11 @@ public class MapGenerator {
 	}
 	
 	public static void exportImage(String imageSegment, String name) throws IOException{
-		FileOutputStream fos = new FileOutputStream(dirOut+"textures\\"+name+".bin");
+		FileOutputStream fos = new FileOutputStream(dirOut+"textures\\"+mesh_name+"\\"+name+".bin");
 		
 		String[] imageBytes = imageSegment.split("[{},]");
-		for(String s: imageBytes) System.out.print(s+"*");
-		System.out.println();
+		//for(String s: imageBytes) System.out.print(s+"*");
+		//System.out.println();
 		//System.out.println(imageSegment);
 		
 		int bytes = 0;
@@ -227,14 +233,15 @@ public class MapGenerator {
 		}
 	}
 
-	public static void translateVerticesToPositiveXZ() throws IOException {
-		int min_x=Integer.MAX_VALUE, min_z=Integer.MAX_VALUE;
+	public static void translateVerticesToPositiveXYZ() throws IOException {
+		int min_x=Integer.MAX_VALUE, min_y = Integer.MAX_VALUE, min_z=Integer.MAX_VALUE;
 		for(Vertex v: verts) {
 			if(v.x < min_x) min_x = v.x;
+			if(v.y < min_y) min_y = v.y;
 			if(v.z < min_z) min_z = v.z;
 		}
-		if(min_x >= 0 && min_z >= 0) return; //already +XZ
-		System.out.println("MINS: "+min_x+" "+min_z);
+		if(min_x >= 0 && min_y >= 0 && min_z >= 0) return; //already +XZ
+		System.out.println("MINS: "+min_x+" "+min_y+" "+min_z);
 		
 		//update the vert blocks in the model.c file
 		ArrayList<String> newSegments = new ArrayList<String>();
@@ -244,7 +251,7 @@ public class MapGenerator {
 			for(int index = segment.indexOf("{{ {"); index >= 0; index = segment.indexOf("{{ {", index+1)) {
 				starts.add(index);
 				ends.add(segment.indexOf("},",index));
-				System.out.println(index+" "+segment.indexOf("},",index));
+				//System.out.println(index+" "+segment.indexOf("},",index));
 			}
 			
 			ArrayList<String> new_vtxs = new ArrayList<String>();
@@ -252,18 +259,18 @@ public class MapGenerator {
 			String temp = "";
 			for(int i=0; i< starts.size(); ++i) {
 				temp = segment.substring(starts.get(i),ends.get(i)); //get each vtx
-				System.out.println(temp);
+				//System.out.println(temp);
 				String[] numbers = temp.split("[\\{\\}\\s,]+");
 				int a = Integer.parseInt(numbers[1]),
 					b = Integer.parseInt(numbers[2]),
 					c = Integer.parseInt(numbers[3]);
 				new_vtx = 	"{{ {" +
 							(a + (-min_x)) + ", " +
-							b + ", " +
+							(b + (-min_y)) + ", " +
 							(c + (-min_z));
 				new_vtxs.add(new_vtx);
-				System.out.println(a+" "+b+" "+c);
-				System.out.println((a+(-min_x))+" "+b+" "+(c+(-min_z)));
+				//System.out.println(a+" "+b+" "+c);
+				//System.out.println((a+(-min_x))+" "+(b+(-min_y))+" "+(c+(-min_z)));
 			}
 			temp = segment.substring(0,starts.get(0));
 			for(int i=0; i< starts.size(); ++i) {
@@ -283,7 +290,7 @@ public class MapGenerator {
 		ArrayList<Vertex> new_verts = new ArrayList<Vertex>();
 		for(int i=0; i< verts.size(); ++i) {
 			Vertex v = verts.get(i);
-			new_verts.add(new Vertex(v.x + (-min_x), v.y, v.z + (-min_z)));
+			new_verts.add(new Vertex(v.x + (-min_x), v.y + (-min_y), v.z + (-min_z)));
 		}
 		verts = new_verts;
 	}
@@ -353,6 +360,9 @@ public class MapGenerator {
 				pallette_index_modifier++;
 		}
 		while(out.contains("gsSPEndDisplayList")) out = out.replace("gsSPEndDisplayList(),", "");
+		//while(out.contains("gsSPGeometryMode(0, G_FOG)")) out = out.replace("gsSPGeometryMode(0, G_FOG),", "");
+		//G_RM_FOG_SHADE_A,
+		//while(out.contains("G_RM_FOG_SHADE_A,")) out = out.replace("G_RM_FOG_SHADE_A,","G_RM_AA_ZB_OPA_SURF,");
 		fos.write(out.getBytes());
 		fos.flush();
 		fos.close();
@@ -365,6 +375,7 @@ public class MapGenerator {
 				image_indices.add(i);
 			}
 			
+			//System.out.println(mat);
 			int pallette_start = image_indices.get(1), //pallette is second mesh_name reference after variable name
 				pallette_end = mat.indexOf("ci4_pal_rgba16") + 14;
 			int	image_start = image_indices.get(2), //image is third mesh_name reference
@@ -409,9 +420,9 @@ public class MapGenerator {
 			byte[] bArray = new BigInteger(String.format("%04x%04x%04x000000000000000000FF",Integer.parseInt(line[0]), 
 																							Integer.parseInt(line[1]),
 																							Integer.parseInt(line[2])),16).toByteArray();
-			System.out.println(String.format("%04x%04x%04x000000000000000000FF",Integer.parseInt(line[0]), 
-																							Integer.parseInt(line[1]),
-																							Integer.parseInt(line[2])));
+			//System.out.println(String.format("%04x%04x%04x000000000000000000FF",Integer.parseInt(line[0]), 
+			//																				Integer.parseInt(line[1]),
+			//																				Integer.parseInt(line[2])));
 			points.add(new Vertex(Integer.parseInt(line[0]), Integer.parseInt(line[1]), Integer.parseInt(line[2])));
 			for(int i=0; i<(16 - bArray.length); ++i) byteList.add((byte)0); //pad if leading 00s get truncated
 			for(byte b: bArray)
@@ -466,11 +477,11 @@ public class MapGenerator {
 				while(color.length() < 8) color="0"+color;//pad with 0s
 				colorArray = new BigInteger("FA000000"+color,16).toByteArray();//set primary color
 				for(int i=1; i<colorArray.length; ++i) byteList.add(colorArray[i]);
-				System.out.println("********"+"FA000000"+color);
+				//System.out.println("********"+"FA000000"+color);
 				continue;
 			}
 			
-			System.out.println("Face "+(index++)+" buffer chunk: "+buffer_chunk);
+			//System.out.println("Face "+(index++)+" buffer chunk: "+buffer_chunk);
 			//Fix 1-indexing
 			line[0] = ""+(Integer.parseInt(line[0])-1);
 			line[1] = ""+(Integer.parseInt(line[1])-1);
@@ -483,7 +494,7 @@ public class MapGenerator {
 						String segmented_addr = String.format("%06x", buffer_chunk*32*16);
 						vertArray = new BigInteger("0102004006"+segmented_addr,16).toByteArray(); //start loading vertices at index 0
 						for(byte b: vertArray) byteList.add(b);
-						System.out.println("***"+"0102004006"+segmented_addr);
+						//System.out.println("***"+"0102004006"+segmented_addr);
 					}
 			} else {
 				String segmented_addr1 = String.format("%06x", Integer.parseInt(line[0])*16),
@@ -493,13 +504,13 @@ public class MapGenerator {
 											"0100100406"+segmented_addr2+
 											"0100100606"+segmented_addr3,16).toByteArray(); //start loading vertices at index 0
 				for(byte b: vertArray) byteList.add(b);
-				System.out.println(	"***0100100206"+segmented_addr1+
-									"***0100100406"+segmented_addr2+
-									"***0100100606"+segmented_addr3);
+				//System.out.println(	"***0100100206"+segmented_addr1+
+				//					"***0100100406"+segmented_addr2+
+				//					"***0100100606"+segmented_addr3);
 				
 				//add simplified G_TRI command
 				byte[] bArray = new BigInteger("0500020400000000",16).toByteArray();
-				System.out.println("0500020400000000");
+				//System.out.println("0500020400000000");
 				Vertex 	v1 = verts.get(Integer.parseInt(line[0])),
 						v2 = verts.get(Integer.parseInt(line[1])),
 						v3 = verts.get(Integer.parseInt(line[2]));
@@ -517,9 +528,9 @@ public class MapGenerator {
 			byte[] bArray = new BigInteger(String.format("05%02x%02x%02x00000000",(Integer.parseInt(line[0])*2)%64, 
 																				  (Integer.parseInt(line[1])*2)%64,
 																				  (Integer.parseInt(line[2])*2)%64),16).toByteArray();
-			System.out.println(String.format("05%02x%02x%02x00000000",(Integer.parseInt(line[0])*2)%64, 
-																	  (Integer.parseInt(line[1])*2)%64,
-																	  (Integer.parseInt(line[2])*2)%64));
+			//System.out.println(String.format("05%02x%02x%02x00000000",(Integer.parseInt(line[0])*2)%64, 
+			//														  (Integer.parseInt(line[1])*2)%64,
+			//														  (Integer.parseInt(line[2])*2)%64));
 			//points.add(new Vertex(Integer.parseInt(line[0]), Integer.parseInt(line[1]), Integer.parseInt(line[2])));
 			Vertex 	v1 = verts.get(Integer.parseInt(line[0])),
 					v2 = verts.get(Integer.parseInt(line[1])),
@@ -607,60 +618,170 @@ public class MapGenerator {
 			numFloorTris = 0;
 		for(int i=0; i<tris.size(); ++i) {
 			Triangle t = tris.get(i);
-			System.out.println("Tri "+i+": "+t.x[0]+" "+t.y[0]+" "+t.z[0]+" "
-											+t.x[1]+" "+t.y[1]+" "+t.z[1]+" "
-											+t.x[2]+" "+t.y[2]+" "+t.z[2]+" ");
-			//System.out.println(i);
 			t.setFacingAngle();
 			if(t.isWall) {
-				byte[] wallArray = new BigInteger(String.format("%04x%04x%04x%04x%04x%04x%04x%04x%04x%04x%02xFF0018",t.x[0] & 0xFFFF,t.y[0] & 0xFFFF,t.z[0] & 0xFFFF, 
-						t.x[1] & 0xFFFF,t.y[1] & 0xFFFF,t.z[1] & 0xFFFF, 
-						t.x[2] & 0xFFFF,t.y[2] & 0xFFFF,t.z[2] & 0xFFFF,
-						t.facingAngle,t.directionBit),16).toByteArray();
-				if(t.x[0] < 1) {//special case where string format adds leading 0 to first negative number.. so chop it off
-					wallArray = new BigInteger(String.format("%04x%04x%04x%04x%04x%04x%04x%04x%04x%04x%02xFF0018",t.x[0] & 0xFFFF,t.y[0] & 0xFFFF,t.z[0] & 0xFFFF, 
-						t.x[1] & 0xFFFF,t.y[1] & 0xFFFF,t.z[1] & 0xFFFF, 
-						t.x[2] & 0xFFFF,t.y[2] & 0xFFFF,t.z[2] & 0xFFFF,
-						t.facingAngle,t.directionBit),16).toByteArray();
-					
-					byte[] tmp = new byte[wallArray.length-1];
-					for(int k=1; k<wallArray.length; ++k) tmp[k-1] = wallArray[k];
-					wallArray = tmp;
+				byte[] x0 = new BigInteger(String.format("%04x",t.x[0] & 0xFFFF),16).toByteArray();
+				if(x0.length < 2) {
+					x0 = new byte[]{0,x0[0]};
+				} else if(x0.length > 2) {
+					x0 = new byte[]{x0[1],x0[2]};
 				}
-				for(int j=0; j<(24 - wallArray.length); ++j) wallTriBytes.add((byte)0); //pad if leading 00s get truncated
+				byte[] y0 = new BigInteger(String.format("%04x",t.y[0] & 0xFFFF),16).toByteArray();
+				if(y0.length < 2) {
+					y0 = new byte[]{0,y0[0]};
+				} else if(y0.length > 2) {
+					y0 = new byte[]{y0[1],y0[2]};
+				}
+				byte[] z0 = new BigInteger(String.format("%04x",t.z[0] & 0xFFFF),16).toByteArray();
+				if(z0.length < 2) {
+					z0 = new byte[]{0,z0[0]};
+				} else if(z0.length > 2) {
+					z0 = new byte[]{z0[1],z0[2]};
+				}
+				
+				byte[] x1 = new BigInteger(String.format("%04x",t.x[1] & 0xFFFF),16).toByteArray();
+				if(x1.length < 2) {
+					x1 = new byte[]{0,x1[0]};
+				} else if(x1.length > 2) {
+					x1 = new byte[]{x1[1],x1[2]};
+				}
+				byte[] y1 = new BigInteger(String.format("%04x",t.y[1] & 0xFFFF),16).toByteArray();
+				if(y1.length < 2) {
+					y1 = new byte[]{0,y1[0]};
+				} else if(y1.length > 2) {
+					y1 = new byte[]{y1[1],y1[2]};
+				}
+				byte[] z1 = new BigInteger(String.format("%04x",t.z[1] & 0xFFFF),16).toByteArray();
+				if(z1.length < 2) {
+					z1 = new byte[]{0,z1[0]};
+				} else if(z1.length > 2) {
+					z1 = new byte[]{z1[1],z1[2]};
+				}
+				
+				byte[] x2 = new BigInteger(String.format("%04x",t.x[2] & 0xFFFF),16).toByteArray();
+				if(x2.length < 2) {
+					x2 = new byte[]{0,x2[0]};
+				} else if(x2.length > 2) {
+					x2 = new byte[]{x2[1],x2[2]};
+				}
+				byte[] y2 = new BigInteger(String.format("%04x",t.y[2] & 0xFFFF),16).toByteArray();
+				if(y2.length < 2) {
+					y2 = new byte[]{0,y2[0]};
+				} else if(y2.length > 2) {
+					y2 = new byte[]{y2[1],y2[2]};
+				}
+				byte[] z2 = new BigInteger(String.format("%04x",t.z[2] & 0xFFFF),16).toByteArray();
+				if(z2.length < 2) {
+					z2 = new byte[]{0,z2[0]};
+				} else if(z2.length > 2) {
+					z2 = new byte[]{z2[1],z2[2]};
+				}
+				
+				byte[] facingAngle = new BigInteger(String.format("%04x",t.facingAngle),16).toByteArray();
+				if(facingAngle.length < 2) {
+					facingAngle = new byte[]{0,facingAngle[0]};
+				} else if(facingAngle.length > 2) {
+					facingAngle = new byte[]{facingAngle[1],facingAngle[2]};
+				}
+				byte[] directionBit = new byte[] {(byte) t.directionBit};
+				byte[] footer =  new byte[] {(byte) 0xFF, 0x00, 0x18};
+				
+				if((x0.length != 2) || (y0.length != 2) || (z0.length != 2) ||
+						(x1.length != 2) ||(y1.length != 2) ||(z1.length != 2) ||
+						(x2.length != 2) ||(y2.length != 2) ||(z2.length != 2) ||
+						(facingAngle.length != 2) || (directionBit.length != 1) ||(footer.length != 3)) System.out.println("********BAD BYTE ARRAY");
+				
+				byte[] wallArray = new byte[] {x0[0], x0[1], y0[0], y0[1], z0[0], z0[1],
+										x1[0], x1[1], y1[0], y1[1], z1[0], z1[1],
+										x2[0], x2[1], y2[0], y2[1], z2[0], z2[1],
+										facingAngle[0], facingAngle[1], directionBit[0],
+										footer[0], footer[1], footer[2]
+										};
+				
 				for(byte b: wallArray) {
+					System.out.printf("%02x", b);
 					wallTriBytes.add(b);
-					System.out.printf("%02x",b);
 				}
 				System.out.println();
-				System.out.println(String.format("w %04x%04x%04x%04x%04x%04x%04x%04x%04x%04x%02xFF0018",t.x[0] & 0xFFFF,t.y[0] & 0xFFFF,t.z[0] & 0xFFFF, 
-						t.x[1] & 0xFFFF,t.y[1] & 0xFFFF,t.z[1] & 0xFFFF, 
-						t.x[2] & 0xFFFF,t.y[2] & 0xFFFF,t.z[2] & 0xFFFF,
-						t.facingAngle,t.directionBit));
 				numWallTris++;
 				if(wallTriBytes.size() % 2 != 0) System.out.println("bad");
 			}
-			byte[] floorArray = new BigInteger(String.format("%04x%04x%04x%04x%04x%04x%04x%04x%04x000001000F70",(t.x[0]*6) & 0xFFFF,(t.x[1]*6) & 0xFFFF,(t.x[2]*6) & 0xFFFF, 
-					(t.y[0]*6) & 0xFFFF,(t.y[1]*6) & 0xFFFF,(t.y[2]*6) & 0xFFFF, 
-					(t.z[0]*6) & 0xFFFF,(t.z[1]*6) & 0xFFFF,(t.z[2]*6) & 0xFFFF),16).toByteArray();
-			
-			if(t.x[0] < 0) {//special case where string format adds leading 0 to first negative number.. so chop it off
-				floorArray = new BigInteger(String.format("%04x%04x%04x%04x%04x%04x%04x%04x%04x000001000F70",(t.x[0]*6) & 0xFFFF,(t.x[1]*6) & 0xFFFF,(t.x[2]*6) & 0xFFFF, 
-						(t.y[0]*6) & 0xFFFF,(t.y[1]*6) & 0xFFFF,(t.y[2]*6) & 0xFFFF, 
-						(t.z[0]*6) & 0xFFFF,(t.z[1]*6) & 0xFFFF,(t.z[2]*6) & 0xFFFF),16).toByteArray();
-				byte[] tmp = new byte[floorArray.length-1];
-				for(int k=1; k<floorArray.length; ++k) tmp[k-1] = floorArray[k];
-				floorArray = tmp;
+			byte[] x0 = new BigInteger(String.format("%04x",t.x[0]*6 & 0xFFFF),16).toByteArray();
+			if(x0.length < 2) {
+				x0 = new byte[]{0,x0[0]};
+			} else if(x0.length > 2) {
+				x0 = new byte[]{x0[1],x0[2]};
 			}
-			for(int j=0; j<(24 - floorArray.length); ++j) floorTriBytes.add((byte)0); //pad if leading 00s get truncated
+			byte[] y0 = new BigInteger(String.format("%04x",t.y[0]*6 & 0xFFFF),16).toByteArray();
+			if(y0.length < 2) {
+				y0 = new byte[]{0,y0[0]};
+			} else if(y0.length > 2) {
+				y0 = new byte[]{y0[1],y0[2]};
+			}
+			byte[] z0 = new BigInteger(String.format("%04x",t.z[0]*6 & 0xFFFF),16).toByteArray();
+			if(z0.length < 2) {
+				z0 = new byte[]{0,z0[0]};
+			} else if(z0.length > 2) {
+				z0 = new byte[]{z0[1],z0[2]};
+			}
+			
+			byte[] x1 = new BigInteger(String.format("%04x",t.x[1]*6 & 0xFFFF),16).toByteArray();
+			if(x1.length < 2) {
+				x1 = new byte[]{0,x1[0]};
+			} else if(x1.length > 2) {
+				x1 = new byte[]{x1[1],x1[2]};
+			}
+			byte[] y1 = new BigInteger(String.format("%04x",t.y[1]*6 & 0xFFFF),16).toByteArray();
+			if(y1.length < 2) {
+				y1 = new byte[]{0,y1[0]};
+			} else if(y1.length > 2) {
+				y1 = new byte[]{y1[1],y1[2]};
+			}
+			byte[] z1 = new BigInteger(String.format("%04x",t.z[1]*6 & 0xFFFF),16).toByteArray();
+			if(z1.length < 2) {
+				z1 = new byte[]{0,z1[0]};
+			} else if(z1.length > 2) {
+				z1 = new byte[]{z1[1],z1[2]};
+			}
+			
+			byte[] x2 = new BigInteger(String.format("%04x",t.x[2]*6 & 0xFFFF),16).toByteArray();
+			if(x2.length < 2) {
+				x2 = new byte[]{0,x2[0]};
+			} else if(x2.length > 2) {
+				x2 = new byte[]{x2[1],x2[2]};
+			}
+			byte[] y2 = new BigInteger(String.format("%04x",t.y[2]*6 & 0xFFFF),16).toByteArray();
+			if(y2.length < 2) {
+				y2 = new byte[]{0,y2[0]};
+			} else if(y2.length > 2) {
+				y2 = new byte[]{y2[1],y2[2]};
+			}
+			byte[] z2 = new BigInteger(String.format("%04x",t.z[2]*6 & 0xFFFF),16).toByteArray();
+			if(z2.length < 2) {
+				z2 = new byte[]{0,z2[0]};
+			} else if(z2.length > 2) {
+				z2 = new byte[]{z2[1],z2[2]};
+			}
+			
+			byte[] footer =  new byte[] {0x00,0x00,0x01,0x00,0x0F,0x70};
+			
+			if((x0.length != 2) || (y0.length != 2) || (z0.length != 2) ||
+					(x1.length != 2) ||(y1.length != 2) ||(z1.length != 2) ||
+					(x2.length != 2) ||(y2.length != 2) ||(z2.length != 2) ||
+					(footer.length != 6)) System.out.println("********BAD BYTE ARRAY");
+			
+			
+			byte[] floorArray = new byte[] {x0[0], x0[1], x1[0], x1[1], x2[0], x2[1],
+					y0[0], y0[1], y1[0], y1[1], y2[0], y2[1],
+					z0[0], z0[1], z1[0], z1[1], z2[0], z2[1],
+					footer[0], footer[1], footer[2], footer[3], footer[4], footer[5]
+					};
+
 			for(byte b: floorArray) {
 				floorTriBytes.add(b);
 				System.out.printf("%02x",b);
 			}
 			System.out.println();
-			System.out.println(String.format("f %04x%04x%04x%04x%04x%04x%04x%04x%04x000001000F70",t.x[0]*6 & 0xFFFF,t.x[1]*6 & 0xFFFF,t.x[2]*6 & 0xFFFF, 
-					t.y[0]*6 & 0xFFFF,t.y[1]*6 & 0xFFFF,t.y[2]*6 & 0xFFFF, 
-					t.z[0]*6 & 0xFFFF,t.z[1]*6 & 0xFFFF,t.z[2]*6 & 0xFFFF));
 			numFloorTris++;
 		}
 		floorSize = String.format("%08x", numFloorTris*24+8);
