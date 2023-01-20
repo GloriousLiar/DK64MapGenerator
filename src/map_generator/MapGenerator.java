@@ -36,6 +36,12 @@ public class MapGenerator {
 	
 	public static int f3dex2Size;
 	
+	//collision stuff
+	public static int gridSizeX = 400, gridSizeZ = 400;
+	public static int gridRows = -1, gridColumns = -1;
+	public static int gridMinX = Integer.MAX_VALUE, gridMaxX = Integer.MIN_VALUE;
+	public static int gridMinZ = Integer.MAX_VALUE, gridMaxZ = Integer.MIN_VALUE;
+	public static ArrayList<ArrayList<Byte>> gridEntryWallBytes, gridEntryFloorBytes;
 	
 	//blender stuff
 	public static ArrayList<String> vtxSegments,
@@ -53,22 +59,6 @@ public class MapGenerator {
 	
 	
 	public static void main(String[] args) throws IOException, FileNotFoundException {
-		/* Uncomment for level geometry
-		 
-		File file = new File(fileName);
-		generateGeometryFileVertices(file);
-		generateGeometryFileFaces(file);
-		generateFloorAndWallFiles();
-		generateHeaderAndFooter();
-		generateGeometryFile();*/
-		
-		/*File file = new File(fileName);
-		ModelGenerator.dirOut = dirOut;
-		ModelGenerator.generateGeometryFileVertices(file);
-		ModelGenerator.generateGeometryFileFaces(file);
-		ModelGenerator.generateHeaderAndFooter();
-		ModelGenerator.generateGeometryFile();*/
-		
 		File file = new File(fileName);
 		parseGfx(file);
 		parseImages();
@@ -86,7 +76,6 @@ public class MapGenerator {
 			whole_file+=scan.nextLine();
 		}
 		String[] segments = whole_file.split(";");
-		//System.out.println(segments.length);
 		
 		vtxSegments = new ArrayList<String>();
 		triSegments = new ArrayList<String>();
@@ -173,10 +162,7 @@ public class MapGenerator {
 		FileOutputStream fos = new FileOutputStream(dirOut+"textures\\"+mesh_name+"\\"+name+".bin");
 		
 		String[] imageBytes = imageSegment.split("[{},]");
-		//for(String s: imageBytes) System.out.print(s+"*");
-		//System.out.println();
-		//System.out.println(imageSegment);
-		
+
 		int bytes = 0;
 		for(int i=1; i<imageBytes.length; ++i) {
 			if(!imageBytes[i].contains("0x")) continue;
@@ -186,21 +172,6 @@ public class MapGenerator {
 				bArray[j/2] = (byte) ((Character.digit(hex.charAt(j), 16) << 4) + Character.digit(hex.charAt(j+1), 16));
 			}
 			fos.write(bArray);
-			
-			//if(!imageBytes[i].contains("0x")) continue;
-			//System.out.println(imageBytes[i].substring(imageBytes[i].indexOf("0x")+2).trim());
-			//String hex = imageBytes[i].substring(imageBytes[i].indexOf("0x")+2).trim();
-			//fos.write(new BigInteger(hex,16).toByteArray());
-			//bytes += new BigInteger(hex,16).toByteArray().length;
-			//System.out.println(bytes);
-			//for(byte b: new BigInteger(hex,16).toByteArray()) System.out.print(b+" ");
-			//System.out.println();
-			//if(new BigInteger(hex,16).toByteArray().length != 8) {
-			//	System.out.println("bad"+new BigInteger(hex,16).toByteArray().length);
-			//	System.out.println(hex);
-			//	for(byte b: new BigInteger(hex,16).toByteArray()) System.out.print(b+" ");
-			//	System.out.println();
-			//}
 		}
 		
 		fos.flush();
@@ -251,7 +222,6 @@ public class MapGenerator {
 			for(int index = segment.indexOf("{{ {"); index >= 0; index = segment.indexOf("{{ {", index+1)) {
 				starts.add(index);
 				ends.add(segment.indexOf("},",index));
-				//System.out.println(index+" "+segment.indexOf("},",index));
 			}
 			
 			ArrayList<String> new_vtxs = new ArrayList<String>();
@@ -259,7 +229,7 @@ public class MapGenerator {
 			String temp = "";
 			for(int i=0; i< starts.size(); ++i) {
 				temp = segment.substring(starts.get(i),ends.get(i)); //get each vtx
-				//System.out.println(temp);
+
 				String[] numbers = temp.split("[\\{\\}\\s,]+");
 				int a = Integer.parseInt(numbers[1]),
 					b = Integer.parseInt(numbers[2]),
@@ -269,8 +239,6 @@ public class MapGenerator {
 							(b + (-min_y)) + ", " +
 							(c + (-min_z));
 				new_vtxs.add(new_vtx);
-				//System.out.println(a+" "+b+" "+c);
-				//System.out.println((a+(-min_x))+" "+(b+(-min_y))+" "+(c+(-min_z)));
 			}
 			temp = segment.substring(0,starts.get(0));
 			for(int i=0; i< starts.size(); ++i) {
@@ -280,8 +248,7 @@ public class MapGenerator {
 					temp += new_vtxs.get(i) + segment.substring(ends.get(i));
 				}
 			}
-			//System.out.println(segment);
-			//System.out.println(temp);
+
 			newSegments.add(temp);
 		}
 		vtxSegments = newSegments;
@@ -290,9 +257,22 @@ public class MapGenerator {
 		ArrayList<Vertex> new_verts = new ArrayList<Vertex>();
 		for(int i=0; i< verts.size(); ++i) {
 			Vertex v = verts.get(i);
-			new_verts.add(new Vertex(v.x + (-min_x), v.y + (-min_y), v.z + (-min_z)));
+			Vertex vn = new Vertex(v.x + (-min_x), v.y + (-min_y), v.z + (-min_z));
+			
+			new_verts.add(vn);
+			
+			gridMinX = vn.x < gridMinX ? vn.x : gridMinX;
+			gridMinZ = vn.z < gridMinZ ? vn.z : gridMinZ;
+			gridMaxX = vn.x > gridMaxX ? vn.x : gridMaxX;
+			gridMaxZ = vn.z > gridMaxZ ? vn.z : gridMaxZ;
 		}
 		verts = new_verts;
+		gridColumns = (int)(Math.ceil(((double)gridMaxX) / gridSizeX));
+		gridRows = (int)(Math.ceil(((double)gridMaxZ) / gridSizeZ));
+		
+		System.out.println("MINS: "+gridMinX+" "+gridMinZ);
+		System.out.println("MAXS: "+gridMaxX+" "+gridMaxZ);
+		System.out.println("ROWS: "+gridRows+" COLUMNS: "+gridColumns);
 	}
 	
 	public static void parseFaces() throws IOException {
@@ -337,6 +317,35 @@ public class MapGenerator {
 				}
 			}
 		}
+		
+		HashMap<Integer,Integer> map = new HashMap<Integer,Integer>();
+		for(Triangle face: tris) {
+			face.setGridNumbers(findGridNumbers(face));
+			for(int k : face.gridNumbers) {
+				if(!map.containsKey(k)) {
+					map.put(k, 1);
+				} else {
+					map.put(k, map.get(k)+1);
+				}
+			}
+		}
+		for(int i=0; i<gridRows; ++i) {
+			for(int j=0; j<gridColumns; ++j) {
+				System.out.printf("%5d",map.get(i*gridColumns+j));
+			}
+			System.out.println();
+		}
+	}
+	
+	public static ArrayList<Integer> findGridNumbers(Triangle face) {
+		ArrayList<Integer> gn = new ArrayList<Integer>();
+		for(int i=0; i<3; i++) {
+			int 	x = face.x[i],
+					z = face.z[i];
+			int gridNumber =  (z / gridSizeZ)*gridColumns + (x / gridSizeX);
+			if(!gn.contains(gridNumber)) gn.add(gridNumber);
+		}
+		return gn;
 	}
 	
 	public static void rebuildFile() throws IOException {
@@ -612,11 +621,20 @@ public class MapGenerator {
 	}
 	
 	public static void generateFloorAndWallFiles() throws IOException {
-		ArrayList<Byte> floorTriBytes = new ArrayList<>(),
-						wallTriBytes = new ArrayList<>();
 		int numWallTris = 0,
 			numFloorTris = 0;
+		
+		gridEntryWallBytes = new ArrayList<ArrayList<Byte>>();
+		gridEntryFloorBytes = new ArrayList<ArrayList<Byte>>();
+		for(int i=0; i<gridRows*gridColumns; ++i) {
+			gridEntryWallBytes.add(new ArrayList<Byte>());
+			gridEntryFloorBytes.add(new ArrayList<Byte>());
+		}
+		
 		for(int i=0; i<tris.size(); ++i) {
+			ArrayList<Byte> floorTriBytes = new ArrayList<>(),
+							wallTriBytes = new ArrayList<>();
+			
 			Triangle t = tris.get(i);
 			t.setFacingAngle();
 			if(t.isWall) {
@@ -698,13 +716,14 @@ public class MapGenerator {
 										footer[0], footer[1], footer[2]
 										};
 				
-				for(byte b: wallArray) {
-					System.out.printf("%02x", b);
-					wallTriBytes.add(b);
+				//for each grid the tri is in, add its collision to the list (can be dupes)
+				for(int k : t.gridNumbers) {
+					for(byte b: wallArray) {
+						gridEntryWallBytes.get(k).add(b);
+					}
 				}
-				System.out.println();
+				
 				numWallTris++;
-				if(wallTriBytes.size() % 2 != 0) System.out.println("bad");
 			}
 			byte[] x0 = new BigInteger(String.format("%04x",t.x[0]*6 & 0xFFFF),16).toByteArray();
 			if(x0.length < 2) {
@@ -777,11 +796,12 @@ public class MapGenerator {
 					footer[0], footer[1], footer[2], footer[3], footer[4], footer[5]
 					};
 
-			for(byte b: floorArray) {
-				floorTriBytes.add(b);
-				System.out.printf("%02x",b);
+			//for each grid the tri is in, add its collision to the list (can be dupes)
+			for(int k : t.gridNumbers) {
+				for(byte b: floorArray) {
+					gridEntryFloorBytes.get(k).add(b);
+				}
 			}
-			System.out.println();
 			numFloorTris++;
 		}
 		floorSize = String.format("%08x", numFloorTris*24+8);
@@ -789,26 +809,60 @@ public class MapGenerator {
 		
 		ArrayList<Byte> floorHeader = new ArrayList<Byte>(),
 						wallHeader = new ArrayList<Byte>();
-		byte[] floorHeaderBytes = new BigInteger(String.format("%08x%08x",numFloorTris,numFloorTris*24+8),16).toByteArray(),
-				wallHeaderBytes = new BigInteger(String.format("%08x%08x",numWallTris,numWallTris*24+8),16).toByteArray();
+		byte[] floorHeaderBytes = new BigInteger(String.format("%08x",numFloorTris),16).toByteArray(),
+				wallHeaderBytes = new BigInteger(String.format("%08x",numWallTris),16).toByteArray();
+		
+		ArrayList<Byte> floorOutputBytes = new ArrayList<>(),
+						wallOutputBytes = new ArrayList<>();
+		
+		for(int i=0; i<(4 - floorHeaderBytes.length); ++i) floorHeader.add((byte)0); //pad if leading 00s get truncated
+		for(byte b: floorHeaderBytes) floorHeader.add(b);
+		for(int i=0; i<floorHeader.size(); ++i) floorOutputBytes.add(i,floorHeader.get(i));
+		
+		for(int i=0; i<(4 - wallHeaderBytes.length); ++i) wallHeader.add((byte)0); //pad if leading 00s get truncated
+		for(byte b: wallHeaderBytes) wallHeader.add(b);
+		for(int i=0; i<wallHeader.size(); ++i) wallOutputBytes.add(i,wallHeader.get(i));
 		
 		System.out.println("Tris:"+tris.size()+"\nVerts:"+verts.size());
 		System.out.println("Walls: "+numWallTris+"\nFloors: "+numFloorTris);
 		
-		for(int i=0; i<(8 - floorHeaderBytes.length); ++i) floorHeader.add((byte)0); //pad if leading 00s get truncated
-		for(int i=0; i<(8 - wallHeaderBytes.length); ++i) wallHeader.add((byte)0); //pad if leading 00s get truncated
-		for(byte b: floorHeaderBytes)
-			floorHeader.add(b);
-		for(byte b: wallHeaderBytes)
-			wallHeader.add(b);
-		for(int i=0; i<floorHeader.size(); ++i) {
-			floorTriBytes.add(i,floorHeader.get(i));
-			wallTriBytes.add(i,wallHeader.get(i));
+		int ptrToNextBlock = 4;
+		for(int i=0; i<gridEntryFloorBytes.size(); ++i) {
+			ArrayList<Byte> gridEntryBytes = gridEntryFloorBytes.get(i);
+			ptrToNextBlock = floorOutputBytes.size() + gridEntryBytes.size() + 4;
+			
+			//pad 00s in pointer
+			byte[] ptrBytes = new BigInteger(String.format("%08x", ptrToNextBlock),16).toByteArray();
+			ArrayList<Byte> ptrByteList = new ArrayList<Byte>();
+			for(int j=0; j<(4 - ptrBytes.length); ++j) ptrByteList.add((byte)0);
+			for(byte b: ptrBytes) ptrByteList.add(b);
+			for(byte b: ptrByteList) floorOutputBytes.add(b);
+			
+			for(int j=0; j<gridEntryBytes.size(); ++j) {
+				floorOutputBytes.add(gridEntryBytes.get(j));
+			}
 		}
-		byte[] floorData = new byte[floorTriBytes.size()],
-				wallData = new byte[wallTriBytes.size()];
-		for(int i=0; i<floorTriBytes.size(); ++i) floorData[i] = floorTriBytes.get(i).byteValue();
-		for(int i=0; i<wallTriBytes.size(); ++i) wallData[i] = wallTriBytes.get(i).byteValue();
+		ptrToNextBlock = 4;
+		for(int i=0; i<gridEntryWallBytes.size(); ++i) {
+			ArrayList<Byte> gridEntryBytes = gridEntryWallBytes.get(i);
+			ptrToNextBlock = wallOutputBytes.size() + gridEntryBytes.size() + 4;
+			
+			//pad 00s in pointer
+			byte[] ptrBytes = new BigInteger(String.format("%08x", ptrToNextBlock),16).toByteArray();
+			ArrayList<Byte> ptrByteList = new ArrayList<Byte>();
+			for(int j=0; j<(4 - ptrBytes.length); ++j) ptrByteList.add((byte)0);
+			for(byte b: ptrBytes) ptrByteList.add(b);
+			for(byte b: ptrByteList) wallOutputBytes.add(b);
+			
+			for(int j=0; j<gridEntryBytes.size(); ++j) {
+				wallOutputBytes.add(gridEntryBytes.get(j));
+			}
+		}
+		
+		byte[] 	floorData = new byte[floorOutputBytes.size()],
+				wallData = new byte[wallOutputBytes.size()];
+		for(int i=0; i<floorOutputBytes.size(); ++i) floorData[i] = floorOutputBytes.get(i).byteValue();
+		for(int i=0; i<wallOutputBytes.size(); ++i) wallData[i] = wallOutputBytes.get(i).byteValue();
 		
 		FileOutputStream fos = new FileOutputStream(dirOut+"floors.bin"),
 				fos2 = new FileOutputStream(dirOut+"walls.bin") ;
@@ -846,6 +900,7 @@ class Triangle {
 	boolean isWall = false;
 	int facingAngle = 0;
 	int directionBit = 0;
+	ArrayList<Integer> gridNumbers;
 	public Triangle(int x1, int y1, int z1,
 					int x2, int y2, int z2,
 					int x3, int y3, int z3) {
@@ -876,5 +931,9 @@ class Triangle {
 		//System.out.println(isWall+"\n"+angle);
 		//System.out.println(DK64Angle);
 		facingAngle = DK64Angle;
+	}
+	
+	public void setGridNumbers(ArrayList<Integer> gn) {
+		gridNumbers = gn;
 	}
 }
