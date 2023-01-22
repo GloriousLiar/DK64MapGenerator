@@ -21,7 +21,7 @@ import javax.vecmath.Vector2d;
 import javax.vecmath.Vector3d;
 
 public class MapGenerator {
-	public static final String fileName = "E:\\dev\\eclipse\\DK64MapGenerator\\blender-output\\model_tdl_tooie.c";
+	public static final String fileName = "E:\\dev\\eclipse\\DK64MapGenerator\\blender-output\\model_tdl_tooie_2.c";
 	public static final String dirOut = "C:\\Users\\Jacob\\Desktop\\TDL\\";
 	
 	public static ArrayList<Vertex> verts;
@@ -51,7 +51,7 @@ public class MapGenerator {
 	
 	public static Map<String,Integer> vertexBlocks;
 	
-	public static String mesh_name = "tdl_updated";
+	public static String mesh_name = "tdl_updated2";
 	
 	//first unused index in texture table = 6013
 	//if creating multiple maps, increment by number of textures already used to prevent collisions
@@ -84,8 +84,8 @@ public class MapGenerator {
 		for(String s: segments) {
 			if(s.contains("cull") || s.contains("Cull")) continue;
 			if(s.contains("Gfx")) {
-				if(s.contains("revert") || s.contains("Revert")) continue;
-				else if(s.contains("tri_")) {
+				//if(s.contains("revert") || s.contains("Revert")) continue;
+				if(s.contains("tri_")) {
 					triSegments.add(s);
 				} else if(s.contains("mat")) {
 					materialSegments.add(s);
@@ -201,6 +201,25 @@ public class MapGenerator {
 				segment = segment.substring(end+5);
 				cumulative_vertices++;
 			}
+		}
+		
+		//remove vertex color data until we figure that out, use vertex lighting and set to full brightness
+		for(int i=0; i<vtxSegments.size(); ++i) {
+			String segment = vtxSegments.get(i);
+			String new_segment = "";
+			while(segment.contains(", {")) {
+				new_segment += segment.substring(0,segment.indexOf(", {")+3);
+				segment = segment.substring(segment.indexOf(", {")+3);
+				new_segment += segment.substring(0,segment.indexOf(", {")+3);
+				segment = segment.substring(segment.indexOf(", {")+3);
+				
+				System.out.println(segment.substring(0,segment.indexOf("} }},")));
+				new_segment += "255, 255, 255, 255} }},";
+				segment = segment.substring(segment.indexOf("} }},")+5);
+			}
+			new_segment += segment;
+			System.out.println(new_segment);
+			vtxSegments.set(i,new_segment);
 		}
 	}
 
@@ -355,17 +374,21 @@ public class MapGenerator {
 		
 		int cumulative_verts = 0;
 		int pallette_index_modifier=0;
-		for(int i=0; i<materialSegments.size(); ++i) {
+		for(int i=0; i<materialSegments.size(); i+=2) {
+			//2 material blocks for every tri block
+			//material -> tris -> material revert
 			String 	material = materialSegments.get(i),
-					tris = triSegments.get(i);
+					tris = triSegments.get(i/2),
+					material_revert = materialSegments.get(i+1);
 			String triOut = cleanTriBlock(tris, cumulative_verts);
 			cumulative_verts = Integer.parseInt(triOut.substring(triOut.indexOf("***")+3));
 			triOut= triOut.substring(0,triOut.indexOf("***"));
 			//System.out.println(cumulative_verts);
-			out+= 	cleanMaterial(material,(6013+i+pallette_index_modifier)) + ";\n" +
-					triOut + ";\n";
+			out+= 	cleanMaterial(material,(6013+(i/2)+pallette_index_modifier)) + ";\n" +
+					triOut + ";\n"+
+					material_revert + ";\n";
 			
-			if(material.contains("ci4_pal")) //materials with a pallette take up 2 indices, so increment the index modifier
+			if(!material.contains("revert") && material.contains("ci4_pal")) //materials with a pallette take up 2 indices, so increment the index modifier
 				pallette_index_modifier++;
 		}
 		while(out.contains("gsSPEndDisplayList")) out = out.replace("gsSPEndDisplayList(),", "");
