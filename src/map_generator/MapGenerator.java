@@ -21,8 +21,8 @@ import javax.vecmath.Vector2d;
 import javax.vecmath.Vector3d;
 
 public class MapGenerator {
-	public static final String fileName = "E:\\dev\\eclipse\\DK64MapGenerator\\blender-output\\model_tdl_tooie_2.c";
-	public static final String dirOut = "C:\\Users\\Jacob\\Desktop\\TDL\\";
+	public static final String fileName = "E:\\dev\\banjo-kongzooie redux\\blender\\lair entrance\\model.c";
+	public static final String dirOut = "E:\\dev\\banjo-kongzooie redux\\blender\\lair entrance\\output\\";
 	
 	public static ArrayList<Vertex> verts;
 	public static ArrayList<Triangle> tris;
@@ -51,11 +51,11 @@ public class MapGenerator {
 	
 	public static Map<String,Integer> vertexBlocks;
 	
-	public static String mesh_name = "tdl_updated2";
+	public static String mesh_name = "lair_entrance";
 	
 	//first unused index in texture table = 6013
 	//if creating multiple maps, increment by number of textures already used to prevent collisions
-	public static int texture_index = 6013;
+	public static int texture_index = 6147;
 	
 	
 	public static void main(String[] args) throws IOException, FileNotFoundException {
@@ -118,6 +118,7 @@ public class MapGenerator {
 		FileOutputStream fos = new FileOutputStream(dirOut+"build_imports.txt");
 		String out = "";
 		
+		int build_file_texture_index = texture_index;
 		for(String s: imageSegments) {
 			if(s.contains("_ci4_pal_") || s.contains("_ci4[]")) { //c14 and/or pallette
 				int 	start = s.indexOf(mesh_name) + mesh_name.length() + 1,
@@ -131,7 +132,7 @@ public class MapGenerator {
 				out+= "\t{\n"+
 						"\t\t\"name\": \""+s.substring(start,end)+name+"\",\n" +
 						"\t\t\"pointer_table_index\": 25,\n" +
-						"\t\t\"file_index\": "+(texture_index++)+",\n" +
+						"\t\t\"file_index\": "+(build_file_texture_index++)+",\n" +
 						"\t\t\"source_file\": \"bin/"+mesh_name+"/"+s.substring(start,end)+name+".bin\",\n" +
 						"\t\t\"do_not_extract\": True\n" +
 					  "\t},\n";
@@ -145,7 +146,7 @@ public class MapGenerator {
 				out+= "\t{\n"+
 						"\t\t\"name\": \""+s.substring(start,end)+"\",\n" +
 						"\t\t\"pointer_table_index\": 25,\n" +
-						"\t\t\"file_index\": "+(texture_index++)+",\n" +
+						"\t\t\"file_index\": "+(build_file_texture_index++)+",\n" +
 						"\t\t\"source_file\": \"bin/"+mesh_name+"/"+s.substring(start,end)+".bin\",\n" +
 						"\t\t\"do_not_extract\": True\n" +
 					  "\t},\n";
@@ -384,7 +385,7 @@ public class MapGenerator {
 			cumulative_verts = Integer.parseInt(triOut.substring(triOut.indexOf("***")+3));
 			triOut= triOut.substring(0,triOut.indexOf("***"));
 			//System.out.println(cumulative_verts);
-			out+= 	cleanMaterial(material,(6013+(i/2)+pallette_index_modifier)) + ";\n" +
+			out+= 	cleanMaterial(material,(texture_index+(i/2)+pallette_index_modifier)) + ";\n" +
 					triOut + ";\n"+
 					material_revert + ";\n";
 			
