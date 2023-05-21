@@ -21,8 +21,8 @@ import javax.vecmath.Vector2d;
 import javax.vecmath.Vector3d;
 
 public class MapGenerator {
-	public static final String fileName = "E:\\dev\\banjo-kongzooie redux\\blender\\lair entrance\\model.c";
-	public static final String dirOut = "E:\\dev\\banjo-kongzooie redux\\blender\\lair entrance\\output\\";
+	public static String fileName = "E:\\dev\\banjo-kongzooie redux\\blender\\banjos_house\\banjos_house\\model.c";
+	public static String dirOut = "E:\\dev\\banjo-kongzooie redux\\blender\\banjos_house\\banjos_house\\output\\";
 	
 	public static ArrayList<Vertex> verts;
 	public static ArrayList<Triangle> tris;
@@ -35,6 +35,8 @@ public class MapGenerator {
 	public static String floorSize, wallSize;
 	
 	public static int f3dex2Size;
+	
+	public static boolean water_exists = false;
 	
 	//collision stuff
 	public static int gridSizeX = 400, gridSizeZ = 400;
@@ -51,14 +53,18 @@ public class MapGenerator {
 	
 	public static Map<String,Integer> vertexBlocks;
 	
-	public static String mesh_name = "lair_entrance";
+	public static String mesh_name;
 	
 	//first unused index in texture table = 6013
 	//if creating multiple maps, increment by number of textures already used to prevent collisions
-	public static int texture_index = 6147;
-	
+	public static int texture_index = 6013;
 	
 	public static void main(String[] args) throws IOException, FileNotFoundException {
+		fileName = args[0].replaceAll("\"", "");
+		dirOut = args[1].replaceAll("\"", "")+"\\";
+		mesh_name = args[2].replaceAll("\"", "");
+		water_exists = args[3].replaceAll("\"", "").equalsIgnoreCase("true") ? true : false;
+		texture_index = Integer.parseInt(args[4].replaceAll("\"", ""));
 		File file = new File(fileName);
 		parseGfx(file);
 		parseImages();
@@ -188,7 +194,7 @@ public class MapGenerator {
 			int start = segment.indexOf("Vtx")+4;
 			int end = segment.indexOf("[");
 			vertexBlocks.put(segment.substring(start,end), cumulative_vertices);
-			//System.out.println(segment.substring(start,end)+" "+cumulative_vertices);
+			////System.out.println(segment.substring(start,end)+" "+cumulative_vertices);
 			
 			segment = segment.substring(segment.indexOf("{")+1);
 			while(segment.contains("{{ {")) {
@@ -214,12 +220,13 @@ public class MapGenerator {
 				new_segment += segment.substring(0,segment.indexOf(", {")+3);
 				segment = segment.substring(segment.indexOf(", {")+3);
 				
-				System.out.println(segment.substring(0,segment.indexOf("} }},")));
-				new_segment += "255, 255, 255, 255} }},";
+				//System.out.println(segment.substring(0,segment.indexOf("} }},")));
+				//new_segment += "255, 255, 255, 255} }},";
+				new_segment += segment.substring(0,segment.indexOf("} }},")+5);
 				segment = segment.substring(segment.indexOf("} }},")+5);
 			}
 			new_segment += segment;
-			System.out.println(new_segment);
+			//System.out.println(new_segment);
 			vtxSegments.set(i,new_segment);
 		}
 	}
@@ -232,7 +239,7 @@ public class MapGenerator {
 			if(v.z < min_z) min_z = v.z;
 		}
 		if(min_x >= 0 && min_y >= 0 && min_z >= 0) return; //already +XZ
-		System.out.println("MINS: "+min_x+" "+min_y+" "+min_z);
+		//System.out.println("MINS: "+min_x+" "+min_y+" "+min_z);
 		
 		//update the vert blocks in the model.c file
 		ArrayList<String> newSegments = new ArrayList<String>();
@@ -247,6 +254,8 @@ public class MapGenerator {
 			ArrayList<String> new_vtxs = new ArrayList<String>();
 			String new_vtx = "";
 			String temp = "";
+			
+			int water_multiplier = water_exists ? 3 : 1; //no idea why but with chunks/water planes *3 the visual vertices
 			for(int i=0; i< starts.size(); ++i) {
 				temp = segment.substring(starts.get(i),ends.get(i)); //get each vtx
 
@@ -255,9 +264,9 @@ public class MapGenerator {
 					b = Integer.parseInt(numbers[2]),
 					c = Integer.parseInt(numbers[3]);
 				new_vtx = 	"{{ {" +
-							(a + (-min_x)) + ", " +
-							(b + (-min_y)) + ", " +
-							(c + (-min_z));
+							(a + (-min_x))*water_multiplier + ", " +
+							(b + (-min_y))*water_multiplier + ", " +
+							(c + (-min_z))*water_multiplier;
 				new_vtxs.add(new_vtx);
 			}
 			temp = segment.substring(0,starts.get(0));
@@ -290,9 +299,9 @@ public class MapGenerator {
 		gridColumns = (int)(Math.ceil(((double)gridMaxX) / gridSizeX));
 		gridRows = (int)(Math.ceil(((double)gridMaxZ) / gridSizeZ));
 		
-		System.out.println("MINS: "+gridMinX+" "+gridMinZ);
-		System.out.println("MAXS: "+gridMaxX+" "+gridMaxZ);
-		System.out.println("ROWS: "+gridRows+" COLUMNS: "+gridColumns);
+		//System.out.println("MINS: "+gridMinX+" "+gridMinZ);
+		//System.out.println("MAXS: "+gridMaxX+" "+gridMaxZ);
+		//System.out.println("ROWS: "+gridRows+" COLUMNS: "+gridColumns);
 	}
 	
 	public static void parseFaces() throws IOException {
@@ -351,9 +360,9 @@ public class MapGenerator {
 		}
 		for(int i=0; i<gridRows; ++i) {
 			for(int j=0; j<gridColumns; ++j) {
-				System.out.printf("%5d",map.get(i*gridColumns+j));
+				//System.out.printf("%5d",map.get(i*gridColumns+j));
 			}
-			System.out.println();
+			//System.out.println();
 		}
 	}
 	
@@ -384,7 +393,7 @@ public class MapGenerator {
 			String triOut = cleanTriBlock(tris, cumulative_verts);
 			cumulative_verts = Integer.parseInt(triOut.substring(triOut.indexOf("***")+3));
 			triOut= triOut.substring(0,triOut.indexOf("***"));
-			//System.out.println(cumulative_verts);
+			////System.out.println(cumulative_verts);
 			out+= 	cleanMaterial(material,(texture_index+(i/2)+pallette_index_modifier)) + ";\n" +
 					triOut + ";\n"+
 					material_revert + ";\n";
@@ -408,7 +417,7 @@ public class MapGenerator {
 				image_indices.add(i);
 			}
 			
-			//System.out.println(mat);
+			////System.out.println(mat);
 			int pallette_start = image_indices.get(1), //pallette is second mesh_name reference after variable name
 				pallette_end = mat.indexOf("ci4_pal_rgba16") + 14;
 			int	image_start = image_indices.get(2), //image is third mesh_name reference
@@ -436,7 +445,7 @@ public class MapGenerator {
 			String vert_string = vertexDLs[i].substring(vertexDLs[i].indexOf(",")+1);
 			vert_string = vert_string.substring(0, vert_string.indexOf(","));
 			verts+=Integer.parseInt(vert_string.trim());
-			//System.out.println(vert_string+" "+verts);
+			////System.out.println(vert_string+" "+verts);
 		}
 		return ret+"***"+verts;
 	}
@@ -453,7 +462,7 @@ public class MapGenerator {
 			byte[] bArray = new BigInteger(String.format("%04x%04x%04x000000000000000000FF",Integer.parseInt(line[0]), 
 																							Integer.parseInt(line[1]),
 																							Integer.parseInt(line[2])),16).toByteArray();
-			//System.out.println(String.format("%04x%04x%04x000000000000000000FF",Integer.parseInt(line[0]), 
+			////System.out.println(String.format("%04x%04x%04x000000000000000000FF",Integer.parseInt(line[0]), 
 			//																				Integer.parseInt(line[1]),
 			//																				Integer.parseInt(line[2])));
 			points.add(new Vertex(Integer.parseInt(line[0]), Integer.parseInt(line[1]), Integer.parseInt(line[2])));
@@ -510,11 +519,11 @@ public class MapGenerator {
 				while(color.length() < 8) color="0"+color;//pad with 0s
 				colorArray = new BigInteger("FA000000"+color,16).toByteArray();//set primary color
 				for(int i=1; i<colorArray.length; ++i) byteList.add(colorArray[i]);
-				//System.out.println("********"+"FA000000"+color);
+				////System.out.println("********"+"FA000000"+color);
 				continue;
 			}
 			
-			//System.out.println("Face "+(index++)+" buffer chunk: "+buffer_chunk);
+			////System.out.println("Face "+(index++)+" buffer chunk: "+buffer_chunk);
 			//Fix 1-indexing
 			line[0] = ""+(Integer.parseInt(line[0])-1);
 			line[1] = ""+(Integer.parseInt(line[1])-1);
@@ -527,7 +536,7 @@ public class MapGenerator {
 						String segmented_addr = String.format("%06x", buffer_chunk*32*16);
 						vertArray = new BigInteger("0102004006"+segmented_addr,16).toByteArray(); //start loading vertices at index 0
 						for(byte b: vertArray) byteList.add(b);
-						//System.out.println("***"+"0102004006"+segmented_addr);
+						////System.out.println("***"+"0102004006"+segmented_addr);
 					}
 			} else {
 				String segmented_addr1 = String.format("%06x", Integer.parseInt(line[0])*16),
@@ -537,13 +546,13 @@ public class MapGenerator {
 											"0100100406"+segmented_addr2+
 											"0100100606"+segmented_addr3,16).toByteArray(); //start loading vertices at index 0
 				for(byte b: vertArray) byteList.add(b);
-				//System.out.println(	"***0100100206"+segmented_addr1+
+				////System.out.println(	"***0100100206"+segmented_addr1+
 				//					"***0100100406"+segmented_addr2+
 				//					"***0100100606"+segmented_addr3);
 				
 				//add simplified G_TRI command
 				byte[] bArray = new BigInteger("0500020400000000",16).toByteArray();
-				//System.out.println("0500020400000000");
+				////System.out.println("0500020400000000");
 				Vertex 	v1 = verts.get(Integer.parseInt(line[0])),
 						v2 = verts.get(Integer.parseInt(line[1])),
 						v3 = verts.get(Integer.parseInt(line[2]));
@@ -561,7 +570,7 @@ public class MapGenerator {
 			byte[] bArray = new BigInteger(String.format("05%02x%02x%02x00000000",(Integer.parseInt(line[0])*2)%64, 
 																				  (Integer.parseInt(line[1])*2)%64,
 																				  (Integer.parseInt(line[2])*2)%64),16).toByteArray();
-			//System.out.println(String.format("05%02x%02x%02x00000000",(Integer.parseInt(line[0])*2)%64, 
+			////System.out.println(String.format("05%02x%02x%02x00000000",(Integer.parseInt(line[0])*2)%64, 
 			//														  (Integer.parseInt(line[1])*2)%64,
 			//														  (Integer.parseInt(line[2])*2)%64));
 			//points.add(new Vertex(Integer.parseInt(line[0]), Integer.parseInt(line[1]), Integer.parseInt(line[2])));
@@ -731,7 +740,7 @@ public class MapGenerator {
 				if((x0.length != 2) || (y0.length != 2) || (z0.length != 2) ||
 						(x1.length != 2) ||(y1.length != 2) ||(z1.length != 2) ||
 						(x2.length != 2) ||(y2.length != 2) ||(z2.length != 2) ||
-						(facingAngle.length != 2) || (directionBit.length != 1) ||(footer.length != 3)) System.out.println("********BAD BYTE ARRAY");
+						(facingAngle.length != 2) || (directionBit.length != 1) ||(footer.length != 3)) ;//System.out.println("********BAD BYTE ARRAY");
 				
 				byte[] wallArray = new byte[] {x0[0], x0[1], y0[0], y0[1], z0[0], z0[1],
 										x1[0], x1[1], y1[0], y1[1], z1[0], z1[1],
@@ -811,7 +820,7 @@ public class MapGenerator {
 			if((x0.length != 2) || (y0.length != 2) || (z0.length != 2) ||
 					(x1.length != 2) ||(y1.length != 2) ||(z1.length != 2) ||
 					(x2.length != 2) ||(y2.length != 2) ||(z2.length != 2) ||
-					(footer.length != 6)) System.out.println("********BAD BYTE ARRAY");
+					(footer.length != 6)) ;//System.out.println("********BAD BYTE ARRAY");
 			
 			
 			byte[] floorArray = new byte[] {x0[0], x0[1], x1[0], x1[1], x2[0], x2[1],
@@ -847,8 +856,8 @@ public class MapGenerator {
 		for(byte b: wallHeaderBytes) wallHeader.add(b);
 		for(int i=0; i<wallHeader.size(); ++i) wallOutputBytes.add(i,wallHeader.get(i));
 		
-		System.out.println("Tris:"+tris.size()+"\nVerts:"+verts.size());
-		System.out.println("Walls: "+numWallTris+"\nFloors: "+numFloorTris);
+		//System.out.println("Tris:"+tris.size()+"\nVerts:"+verts.size());
+		//System.out.println("Walls: "+numWallTris+"\nFloors: "+numFloorTris);
 		
 		int ptrToNextBlock = 4;
 		for(int i=0; i<gridEntryFloorBytes.size(); ++i) {
@@ -937,7 +946,7 @@ class Triangle {
 		Vector3d v1 = new Vector3d(x[1] - x[0], y[1] - y[0], z[1] - z[0]);
 		Vector3d v2 = new Vector3d(x[2] - x[0], y[2] - y[0], z[2] - z[0]);
 		Vector3d cp = new Vector3d(); cp.cross(v1, v2);
-		//System.out.println(cp);
+		////System.out.println(cp);
 		Vector3d norm = new Vector3d(cp.x,cp.y,cp.z);
 		norm.normalize();
 		
@@ -945,15 +954,15 @@ class Triangle {
 				Math.toDegrees(norm.angle(new Vector3d(0,1,0))) > 55.0) {
 			isWall = true;
 		}
-		//System.out.println(norm);
-		//System.out.println(Math.toDegrees(Math.atan2(norm.x, norm.z)));
+		////System.out.println(norm);
+		////System.out.println(Math.toDegrees(Math.atan2(norm.x, norm.z)));
 		double angle = (Math.toDegrees(Math.atan2(norm.x,norm.z)) + 360) % 360;
 		directionBit = 1;
 		
-		//System.out.println("Angle: "+angle);
+		////System.out.println("Angle: "+angle);
 		int DK64Angle = (int)(angle/360 * 4096);
-		//System.out.println(isWall+"\n"+angle);
-		//System.out.println(DK64Angle);
+		////System.out.println(isWall+"\n"+angle);
+		////System.out.println(DK64Angle);
 		facingAngle = DK64Angle;
 	}
 	
