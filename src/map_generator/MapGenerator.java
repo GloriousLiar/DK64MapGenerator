@@ -65,15 +65,22 @@ public class MapGenerator {
 		mesh_name = args[2].replaceAll("\"", "");
 		water_exists = args[3].replaceAll("\"", "").equalsIgnoreCase("true") ? true : false;
 		texture_index = Integer.parseInt(args[4].replaceAll("\"", ""));
-		texture_index = 6099;
 		File file = new File(fileName);
+		System.out.println("Parsing model file.");
 		parseGfx(file);
+		System.out.println("Parsing images.");
 		parseImages();
+		System.out.println("Parsing vertices.");
 		parseVertices();
+		System.out.println("Translating vertices to positive XZ.");
 		translateVerticesToPositiveXYZ();
+		System.out.println("Parsing triangle faces.");
 		parseFaces();
+		System.out.println("Generating collisions.");
 		generateFloorAndWallFiles();
+		System.out.println("Building output files.");
 		rebuildFile();
+		System.out.println("DK64 Map Generator: done.");
 	}
 
 	public static void parseGfx(File f) throws IOException {
@@ -300,9 +307,9 @@ public class MapGenerator {
 		gridColumns = (int)(Math.ceil(((double)gridMaxX) / gridSizeX));
 		gridRows = (int)(Math.ceil(((double)gridMaxZ) / gridSizeZ));
 		
-		//System.out.println("MINS: "+gridMinX+" "+gridMinZ);
-		//System.out.println("MAXS: "+gridMaxX+" "+gridMaxZ);
-		//System.out.println("ROWS: "+gridRows+" COLUMNS: "+gridColumns);
+		System.out.println("MINS: "+gridMinX+" "+gridMinZ);
+		System.out.println("MAXS: "+gridMaxX+" "+gridMaxZ);
+		System.out.println("ROWS: "+gridRows+" COLUMNS: "+gridColumns);
 	}
 	
 	public static void parseFaces() throws IOException {
@@ -889,8 +896,8 @@ public class MapGenerator {
 		for(byte b: wallHeaderBytes) wallHeader.add(b);
 		for(int i=0; i<wallHeader.size(); ++i) wallOutputBytes.add(i,wallHeader.get(i));
 		
-		//System.out.println("Tris:"+tris.size()+"\nVerts:"+verts.size());
-		//System.out.println("Walls: "+numWallTris+"\nFloors: "+numFloorTris);
+		System.out.println("Tris:"+tris.size()+"\nVerts:"+verts.size());
+		System.out.println("Walls: "+numWallTris+"\nFloors: "+numFloorTris);
 		
 		int ptrToNextBlock = 4;
 		for(int i=0; i<gridEntryFloorBytes.size(); ++i) {
