@@ -65,6 +65,7 @@ public class MapGenerator {
 		mesh_name = args[2].replaceAll("\"", "");
 		water_exists = args[3].replaceAll("\"", "").equalsIgnoreCase("true") ? true : false;
 		texture_index = Integer.parseInt(args[4].replaceAll("\"", ""));
+		texture_index = 6099;
 		File file = new File(fileName);
 		parseGfx(file);
 		parseImages();
@@ -366,14 +367,46 @@ public class MapGenerator {
 		}
 	}
 	
+	/*
+	 *April 14, 2024 
+	 *Found bug that its not sufficient to put collisions only into grids where vertices lay.
+	 *Fixed so that it adds grid numbers for the entire rectangle that the tri's verts span on the grid.
+	 */
 	public static ArrayList<Integer> findGridNumbers(Triangle face) {
 		ArrayList<Integer> gn = new ArrayList<Integer>();
+		int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE;
+		int minZ = Integer.MAX_VALUE, maxZ = Integer.MIN_VALUE;
 		for(int i=0; i<3; i++) {
 			int 	x = face.x[i],
 					z = face.z[i];
-			int gridNumber =  (z / gridSizeZ)*gridColumns + (x / gridSizeX);
-			if(!gn.contains(gridNumber)) gn.add(gridNumber);
+			if(x > maxX) maxX = x;
+			if(x < minX) minX = x;
+			if(z > maxZ) maxZ = z;
+			if(z < minZ) minZ = z;
 		}
+		/*if(minX == 799 || minX==774 || minX==660 || maxX == 799 || maxX==774 || maxX==660 )
+			System.out.println("GRID NUMBERS");
+		else
+			return gn;*/
+		
+		//int gridNumber =  (z / gridSizeZ)*gridColumns + (x / gridSizeX);
+		int TL = (minZ / gridSizeZ)*gridColumns + (minX / gridSizeX),
+			TR = (minZ / gridSizeZ)*gridColumns + (maxX / gridSizeX),
+			BL = (maxZ / gridSizeZ)*gridColumns + (minX / gridSizeX),
+			BR = (maxZ / gridSizeZ)*gridColumns + (maxX / gridSizeX);
+		//System.out.println("TL: "+TL+" TR: "+TR+" BL: "+BL+" BR: "+BR);
+		for(int i = 0; i<=(BL - TL)/gridColumns; ++i) {
+			for(int j=0; j<=(TR - TL); ++j) {
+				int gridNumber = TL + i*gridColumns + j;
+				if(!gn.contains(gridNumber)) gn.add(gridNumber);
+				//System.out.println("GRID NUMBER: "+gridNumber);
+			}
+		}
+		
+		//if(!gn.contains(gridNumber)) gn.add(gridNumber);
+		//if(x == 799 || x==774 || x==660)
+		//	System.out.println("GRID NUMBER: "+gridNumber+" "+x+" "+z);
+		//System.out.println();
 		return gn;
 	}
 	
