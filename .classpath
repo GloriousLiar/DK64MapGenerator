@@ -6,7 +6,7 @@
 		</attributes>
 	</classpathentry>
 	<classpathentry kind="src" path="src"/>
-	<classpathentry kind="lib" path="vecmath.jar"/>
-	<classpathentry kind="lib" path="C:/Projects/DK64/Git/DK64MapGenerator/vecmath.jar"/>
+	<classpathentry exported="true" kind="lib" path="vecmath.jar"/>
+	<classpathentry exported="true" kind="lib" path="C:/Projects/DK64/Git/DK64MapGenerator/vecmath.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

@@ -60,11 +60,16 @@ public class MapGenerator {
 	public static int texture_index = 6013;
 	
 	public static void main(String[] args) throws IOException, FileNotFoundException {
-		fileName = args[0].replaceAll("\"", "");
+		/*fileName = args[0].replaceAll("\"", "");
 		dirOut = args[1].replaceAll("\"", "")+"\\";
 		mesh_name = args[2].replaceAll("\"", "");
 		water_exists = args[3].replaceAll("\"", "").equalsIgnoreCase("true") ? true : false;
-		texture_index = Integer.parseInt(args[4].replaceAll("\"", ""));
+		texture_index = Integer.parseInt(args[4].replaceAll("\"", ""));*/
+		fileName = "C:\\Projects\\DK64\\mumbos-mountain\\map tool\\model.c";
+		dirOut = "C:\\Projects\\DK64\\mumbos-mountain\\map tool\\output\\";
+		mesh_name = "mumbosmountain";
+		water_exists = true;
+		texture_index = 6099;
 		File file = new File(fileName);
 		System.out.println("Parsing model file.");
 		parseGfx(file);
@@ -798,84 +803,86 @@ public class MapGenerator {
 				
 				numWallTris++;
 			}
-			byte[] x0 = new BigInteger(String.format("%04x",t.x[0]*6 & 0xFFFF),16).toByteArray();
-			if(x0.length < 2) {
-				x0 = new byte[]{0,x0[0]};
-			} else if(x0.length > 2) {
-				x0 = new byte[]{x0[1],x0[2]};
-			}
-			byte[] y0 = new BigInteger(String.format("%04x",t.y[0]*6 & 0xFFFF),16).toByteArray();
-			if(y0.length < 2) {
-				y0 = new byte[]{0,y0[0]};
-			} else if(y0.length > 2) {
-				y0 = new byte[]{y0[1],y0[2]};
-			}
-			byte[] z0 = new BigInteger(String.format("%04x",t.z[0]*6 & 0xFFFF),16).toByteArray();
-			if(z0.length < 2) {
-				z0 = new byte[]{0,z0[0]};
-			} else if(z0.length > 2) {
-				z0 = new byte[]{z0[1],z0[2]};
-			}
-			
-			byte[] x1 = new BigInteger(String.format("%04x",t.x[1]*6 & 0xFFFF),16).toByteArray();
-			if(x1.length < 2) {
-				x1 = new byte[]{0,x1[0]};
-			} else if(x1.length > 2) {
-				x1 = new byte[]{x1[1],x1[2]};
-			}
-			byte[] y1 = new BigInteger(String.format("%04x",t.y[1]*6 & 0xFFFF),16).toByteArray();
-			if(y1.length < 2) {
-				y1 = new byte[]{0,y1[0]};
-			} else if(y1.length > 2) {
-				y1 = new byte[]{y1[1],y1[2]};
-			}
-			byte[] z1 = new BigInteger(String.format("%04x",t.z[1]*6 & 0xFFFF),16).toByteArray();
-			if(z1.length < 2) {
-				z1 = new byte[]{0,z1[0]};
-			} else if(z1.length > 2) {
-				z1 = new byte[]{z1[1],z1[2]};
-			}
-			
-			byte[] x2 = new BigInteger(String.format("%04x",t.x[2]*6 & 0xFFFF),16).toByteArray();
-			if(x2.length < 2) {
-				x2 = new byte[]{0,x2[0]};
-			} else if(x2.length > 2) {
-				x2 = new byte[]{x2[1],x2[2]};
-			}
-			byte[] y2 = new BigInteger(String.format("%04x",t.y[2]*6 & 0xFFFF),16).toByteArray();
-			if(y2.length < 2) {
-				y2 = new byte[]{0,y2[0]};
-			} else if(y2.length > 2) {
-				y2 = new byte[]{y2[1],y2[2]};
-			}
-			byte[] z2 = new BigInteger(String.format("%04x",t.z[2]*6 & 0xFFFF),16).toByteArray();
-			if(z2.length < 2) {
-				z2 = new byte[]{0,z2[0]};
-			} else if(z2.length > 2) {
-				z2 = new byte[]{z2[1],z2[2]};
-			}
-			
-			byte[] footer =  new byte[] {0x00,0x00,0x01,0x00,0x0F,0x70};
-			
-			if((x0.length != 2) || (y0.length != 2) || (z0.length != 2) ||
-					(x1.length != 2) ||(y1.length != 2) ||(z1.length != 2) ||
-					(x2.length != 2) ||(y2.length != 2) ||(z2.length != 2) ||
-					(footer.length != 6)) ;//System.out.println("********BAD BYTE ARRAY");
-			
-			
-			byte[] floorArray = new byte[] {x0[0], x0[1], x1[0], x1[1], x2[0], x2[1],
-					y0[0], y0[1], y1[0], y1[1], y2[0], y2[1],
-					z0[0], z0[1], z1[0], z1[1], z2[0], z2[1],
-					footer[0], footer[1], footer[2], footer[3], footer[4], footer[5]
-					};
-
-			//for each grid the tri is in, add its collision to the list (can be dupes)
-			for(int k : t.gridNumbers) {
-				for(byte b: floorArray) {
-					gridEntryFloorBytes.get(k).add(b);
+			if(t.isFloor) { 
+				byte[] x0 = new BigInteger(String.format("%04x",t.x[0]*6 & 0xFFFF),16).toByteArray();
+				if(x0.length < 2) {
+					x0 = new byte[]{0,x0[0]};
+				} else if(x0.length > 2) {
+					x0 = new byte[]{x0[1],x0[2]};
 				}
+				byte[] y0 = new BigInteger(String.format("%04x",t.y[0]*6 & 0xFFFF),16).toByteArray();
+				if(y0.length < 2) {
+					y0 = new byte[]{0,y0[0]};
+				} else if(y0.length > 2) {
+					y0 = new byte[]{y0[1],y0[2]};
+				}
+				byte[] z0 = new BigInteger(String.format("%04x",t.z[0]*6 & 0xFFFF),16).toByteArray();
+				if(z0.length < 2) {
+					z0 = new byte[]{0,z0[0]};
+				} else if(z0.length > 2) {
+					z0 = new byte[]{z0[1],z0[2]};
+				}
+				
+				byte[] x1 = new BigInteger(String.format("%04x",t.x[1]*6 & 0xFFFF),16).toByteArray();
+				if(x1.length < 2) {
+					x1 = new byte[]{0,x1[0]};
+				} else if(x1.length > 2) {
+					x1 = new byte[]{x1[1],x1[2]};
+				}
+				byte[] y1 = new BigInteger(String.format("%04x",t.y[1]*6 & 0xFFFF),16).toByteArray();
+				if(y1.length < 2) {
+					y1 = new byte[]{0,y1[0]};
+				} else if(y1.length > 2) {
+					y1 = new byte[]{y1[1],y1[2]};
+				}
+				byte[] z1 = new BigInteger(String.format("%04x",t.z[1]*6 & 0xFFFF),16).toByteArray();
+				if(z1.length < 2) {
+					z1 = new byte[]{0,z1[0]};
+				} else if(z1.length > 2) {
+					z1 = new byte[]{z1[1],z1[2]};
+				}
+				
+				byte[] x2 = new BigInteger(String.format("%04x",t.x[2]*6 & 0xFFFF),16).toByteArray();
+				if(x2.length < 2) {
+					x2 = new byte[]{0,x2[0]};
+				} else if(x2.length > 2) {
+					x2 = new byte[]{x2[1],x2[2]};
+				}
+				byte[] y2 = new BigInteger(String.format("%04x",t.y[2]*6 & 0xFFFF),16).toByteArray();
+				if(y2.length < 2) {
+					y2 = new byte[]{0,y2[0]};
+				} else if(y2.length > 2) {
+					y2 = new byte[]{y2[1],y2[2]};
+				}
+				byte[] z2 = new BigInteger(String.format("%04x",t.z[2]*6 & 0xFFFF),16).toByteArray();
+				if(z2.length < 2) {
+					z2 = new byte[]{0,z2[0]};
+				} else if(z2.length > 2) {
+					z2 = new byte[]{z2[1],z2[2]};
+				}
+				
+				byte[] footer =  new byte[] {0x00,0x00,0x01,0x00,0x0F,0x70};
+				
+				if((x0.length != 2) || (y0.length != 2) || (z0.length != 2) ||
+						(x1.length != 2) ||(y1.length != 2) ||(z1.length != 2) ||
+						(x2.length != 2) ||(y2.length != 2) ||(z2.length != 2) ||
+						(footer.length != 6)) ;//System.out.println("********BAD BYTE ARRAY");
+				
+				
+				byte[] floorArray = new byte[] {x0[0], x0[1], x1[0], x1[1], x2[0], x2[1],
+						y0[0], y0[1], y1[0], y1[1], y2[0], y2[1],
+						z0[0], z0[1], z1[0], z1[1], z2[0], z2[1],
+						footer[0], footer[1], footer[2], footer[3], footer[4], footer[5]
+						};
+	
+				//for each grid the tri is in, add its collision to the list (can be dupes)
+				for(int k : t.gridNumbers) {
+					for(byte b: floorArray) {
+						gridEntryFloorBytes.get(k).add(b);
+					}
+				}
+				numFloorTris++;
 			}
-			numFloorTris++;
 		}
 		floorSize = String.format("%08x", numFloorTris*24+8);
 		wallSize = String.format("%08x", numWallTris*24+8);
@@ -971,6 +978,7 @@ class Triangle {
 	int[] y = new int[3];
 	int[] z = new int[3];
 	boolean isWall = false;
+	boolean isFloor = true;
 	int facingAngle = 0;
 	int directionBit = 0;
 	ArrayList<Integer> gridNumbers;
@@ -990,14 +998,44 @@ class Triangle {
 		Vector3d norm = new Vector3d(cp.x,cp.y,cp.z);
 		norm.normalize();
 		
-		if(Math.toDegrees(norm.angle(new Vector3d(0,1,0))) < 125.0 &&
-				Math.toDegrees(norm.angle(new Vector3d(0,1,0))) > 55.0) {
+		if(Math.toDegrees(norm.angle(new Vector3d(0,1,0))) < 120.0 &&
+				Math.toDegrees(norm.angle(new Vector3d(0,1,0))) > 60.0) {
 			isWall = true;
+			isFloor = false;
 		}
+		if(Math.toDegrees(norm.angle(new Vector3d(0,1,0))) < 90.0) {
+			isFloor = true;
+		}
+		//System.out.println(Math.toDegrees(norm.angle(new Vector3d(0,1,0))));
 		////System.out.println(norm);
 		////System.out.println(Math.toDegrees(Math.atan2(norm.x, norm.z)));
 		double angle = (Math.toDegrees(Math.atan2(norm.x,norm.z)) + 360) % 360;
-		directionBit = 1;
+		double[] angle_exceptions_list = new double[]{111.5,112,112.5,113,113.5,114,114.5,115,
+												117,117.5,118,118.5,119,119.5,120,120.5,121,121.5,122,												
+												288,288.5,289,289.5,290,290.5,291,291.5,292,202.5,293,293.5,294,
+												329,329.5,330,330.5,331,331.5,332,332.5,333,
+												339.5,340,340.5,341,341.5,342,342.5,343,343.5,344,344.5,345};
+		if(	angle >= 135 && angle < 340) {
+			directionBit = 1;
+			angle = angle;
+		} else {
+			angle = (angle + 180) % 360; //flip 180 degrees
+			directionBit = 0;
+		}
+		//handle list of exceptions where collision gets bad
+		for(int i=0; i<angle_exceptions_list.length; ++i) {
+			if(Math.abs(angle - angle_exceptions_list[i]) <= 0.25) { //within quarter a degree of the angle exception list entry
+				if(directionBit == 0) {
+					angle = (angle + 180) % 360; //flip 180 degrees
+					directionBit = 1;
+					break;
+				} else {
+					angle = (angle + 180) % 360; //flip 180 degrees
+					directionBit = 0;
+					break;
+				}
+			}
+		}
 		
 		////System.out.println("Angle: "+angle);
 		int DK64Angle = (int)(angle/360 * 4096);
