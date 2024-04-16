@@ -60,16 +60,16 @@ public class MapGenerator {
 	public static int texture_index = 6013;
 	
 	public static void main(String[] args) throws IOException, FileNotFoundException {
-		/*fileName = args[0].replaceAll("\"", "");
+		fileName = args[0].replaceAll("\"", "");
 		dirOut = args[1].replaceAll("\"", "")+"\\";
 		mesh_name = args[2].replaceAll("\"", "");
 		water_exists = args[3].replaceAll("\"", "").equalsIgnoreCase("true") ? true : false;
-		texture_index = Integer.parseInt(args[4].replaceAll("\"", ""));*/
-		fileName = "C:\\Projects\\DK64\\mumbos-mountain\\map tool\\model.c";
+		texture_index = Integer.parseInt(args[4].replaceAll("\"", ""));
+		/*fileName = "C:\\Projects\\DK64\\mumbos-mountain\\map tool\\model.c";
 		dirOut = "C:\\Projects\\DK64\\mumbos-mountain\\map tool\\output\\";
 		mesh_name = "mumbosmountain";
 		water_exists = true;
-		texture_index = 6099;
+		texture_index = 6099;*/
 		File file = new File(fileName);
 		System.out.println("Parsing model file.");
 		parseGfx(file);
