@@ -65,11 +65,11 @@ public class MapGenerator {
 		mesh_name = args[2].replaceAll("\"", "");
 		water_exists = args[3].replaceAll("\"", "").equalsIgnoreCase("true") ? true : false;
 		texture_index = Integer.parseInt(args[4].replaceAll("\"", ""));
-		/*fileName = "C:\\Projects\\DK64\\mumbos-mountain\\map tool\\model.c";
-		dirOut = "C:\\Projects\\DK64\\mumbos-mountain\\map tool\\output\\";
-		mesh_name = "mumbosmountain";
-		water_exists = true;
-		texture_index = 6099;*/
+		/*fileName = "C:\\Projects\\DK64\\dk64-hack-base\\blender\\floor_test\\model.c";
+		dirOut = "C:\\Projects\\DK64\\dk64-hack-base\\blender\\floor_test\\output\\";
+		mesh_name = "floor_test";
+		water_exists = false;
+		texture_index = 6013;*/
 		File file = new File(fileName);
 		System.out.println("Parsing model file.");
 		parseGfx(file);
@@ -319,7 +319,31 @@ public class MapGenerator {
 	
 	public static void parseFaces() throws IOException {
 		tris = new ArrayList<Triangle>();
+		int material_counter = 0;
 		for(String segment:triSegments) {
+			//Getting floor properties from material name
+			String material_segment = materialSegments.get(material_counter);
+			System.out.println(material_segment.substring(0,material_segment.indexOf("[]")));
+			int 	prop_void = 0, 
+					prop_floor_type = 0, 
+					sfx = 0;
+			if(material_segment.contains("PROP_VOID")) {
+				prop_void = 0x40;
+			} else if(material_segment.contains("PROP_SAND")) {
+				prop_floor_type = 0x40;
+			} else if(material_segment.contains("PROP_WATER")) {
+				prop_floor_type = 0x01;
+			} else if(material_segment.contains("PROP_DEATH")) {
+				prop_floor_type = 0x10;
+			} else if(material_segment.contains("SFX_WOOD")) {
+				sfx = 0x02;
+			} else if(material_segment.contains("SFX_METAL")) {
+				sfx = 0x08;
+			} else if(material_segment.contains("SFX_LEAVES")) {
+				sfx = 0x01;
+			}
+			material_counter += 2;
+			
 			String[] tri_commands = segment.split("\\),");
 			int vert_start_index = 0;
 			for(String command : tri_commands) {
@@ -339,20 +363,23 @@ public class MapGenerator {
 								v3 = verts.get(Integer.parseInt(indices[4].trim()) + vert_start_index);
 						tris.add(new Triangle(	v1.x,v1.y,v1.z,
 												v2.x,v2.y,v2.z,
-												v3.x,v3.y,v3.z));
+												v3.x,v3.y,v3.z,
+												prop_void, prop_floor_type, sfx));
 								v1 = verts.get(Integer.parseInt(indices[6].trim()) + vert_start_index);
 								v2 = verts.get(Integer.parseInt(indices[7].trim()) + vert_start_index);
 								v3 = verts.get(Integer.parseInt(indices[8].trim()) + vert_start_index);
 						tris.add(new Triangle(	v1.x,v1.y,v1.z,
 												v2.x,v2.y,v2.z,
-												v3.x,v3.y,v3.z));
+												v3.x,v3.y,v3.z,
+												prop_void, prop_floor_type, sfx));
 					} else { //1 tri command
 						Vertex 	v1 = verts.get(Integer.parseInt(indices[2].trim()) + vert_start_index),
 								v2 = verts.get(Integer.parseInt(indices[3].trim()) + vert_start_index),
 								v3 = verts.get(Integer.parseInt(indices[4].trim()) + vert_start_index);
 						tris.add(new Triangle(	v1.x,v1.y,v1.z,
 												v2.x,v2.y,v2.z,
-												v3.x,v3.y,v3.z));
+												v3.x,v3.y,v3.z,
+												prop_void, prop_floor_type, sfx));
 					}
 				} else {
 					continue; //should only get here for end display list command
@@ -603,7 +630,7 @@ public class MapGenerator {
 						v3 = verts.get(Integer.parseInt(line[2]));
 				triData.add(new Triangle(	v1.x, v1.y, v1.z,
 											v2.x, v2.y, v2.z,
-											v3.x, v3.y, v3.z));
+											v3.x, v3.y, v3.z,0,0,0));
 				for(int i=0; i<(8 - bArray.length); ++i) byteList.add((byte)0); //pad if leading 00s get truncated
 				for(byte b: bArray)
 					byteList.add(b);
@@ -624,7 +651,7 @@ public class MapGenerator {
 					v3 = verts.get(Integer.parseInt(line[2]));
 			triData.add(new Triangle(v1.x, v1.y, v1.z,
 									 v2.x, v2.y, v2.z,
-									 v3.x, v3.y, v3.z));
+									 v3.x, v3.y, v3.z,0,0,0));
 			for(int i=0; i<(8 - bArray.length); ++i) byteList.add((byte)0); //pad if leading 00s get truncated
 			for(byte b: bArray)
 				byteList.add(b);
@@ -861,7 +888,10 @@ public class MapGenerator {
 					z2 = new byte[]{z2[1],z2[2]};
 				}
 				
-				byte[] footer =  new byte[] {0x00,0x00,0x01,0x00,0x0F,0x70};
+				byte 	prop_void = (byte)t.prop_void,
+						prop_floor_type = (byte)t.prop_floor_type,
+						sfx = (byte)t.sfx;
+				byte[] footer =  new byte[] {prop_void,prop_floor_type,0x01,sfx,0x0F,0x70};
 				
 				if((x0.length != 2) || (y0.length != 2) || (z0.length != 2) ||
 						(x1.length != 2) ||(y1.length != 2) ||(z1.length != 2) ||
@@ -981,13 +1011,24 @@ class Triangle {
 	boolean isFloor = true;
 	int facingAngle = 0;
 	int directionBit = 0;
+	
+	//Floor properties
+	int prop_void = 0;
+	int prop_floor_type = 0;
+	int sfx = 0;
+	//int brightness = 255; -- not implemented
+	
 	ArrayList<Integer> gridNumbers;
 	public Triangle(int x1, int y1, int z1,
 					int x2, int y2, int z2,
-					int x3, int y3, int z3) {
+					int x3, int y3, int z3,
+					int prop_void, int prop_floor_type, int sfx) {
 		x[0] = x1; x[1] = x2; x[2] = x3;
 		y[0] = y1; y[1] = y2; y[2] = y3;
 		z[0] = z1; z[1] = z2; z[2] = z3;
+		this.prop_void = prop_void;
+		this.prop_floor_type = prop_floor_type;
+		this.sfx = sfx;
 	}
 	
 	public void setFacingAngle() {

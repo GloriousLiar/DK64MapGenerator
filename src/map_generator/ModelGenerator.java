@@ -137,7 +137,7 @@ public class ModelGenerator {
 						v3 = verts.get(Integer.parseInt(line[2]));
 				triData.add(new Triangle(	v1.x, v1.y, v1.z,
 											v2.x, v2.y, v2.z,
-											v3.x, v3.y, v3.z));
+											v3.x, v3.y, v3.z,0,0,0));
 				for(int i=0; i<(8 - bArray.length); ++i) byteList.add((byte)0); //pad if leading 00s get truncated
 				for(byte b: bArray)
 					byteList.add(b);
@@ -158,7 +158,7 @@ public class ModelGenerator {
 					v3 = verts.get(Integer.parseInt(line[2]));
 			triData.add(new Triangle(v1.x, v1.y, v1.z,
 									 v2.x, v2.y, v2.z,
-									 v3.x, v3.y, v3.z));
+									 v3.x, v3.y, v3.z,0,0,0));
 			for(int i=0; i<(8 - bArray.length); ++i) byteList.add((byte)0); //pad if leading 00s get truncated
 			for(byte b: bArray)
 				byteList.add(b);
