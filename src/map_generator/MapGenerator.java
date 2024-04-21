@@ -323,7 +323,7 @@ public class MapGenerator {
 		for(String segment:triSegments) {
 			//Getting floor properties from material name
 			String material_segment = materialSegments.get(material_counter);
-			System.out.println(material_segment.substring(0,material_segment.indexOf("[]")));
+			//System.out.println(material_segment.substring(0,material_segment.indexOf("[]")));
 			int 	prop_void = 0, 
 					prop_floor_type = 0, 
 					sfx = 0;
