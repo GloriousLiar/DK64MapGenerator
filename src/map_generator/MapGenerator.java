@@ -158,8 +158,13 @@ public class MapGenerator {
 				
 				exportImage(s, s.substring(start,end)+name);
 			} else { //rgba16
+				String codec = "";
+				if(s.contains("rgba32")) codec = "rgba32";
+				else if(s.contains("i8")) codec = "i8";
+				else if(s.contains("i16")) codec = "i16";
+				else codec = "rgba16";
 				int 	start = s.indexOf(mesh_name) + mesh_name.length() + 1,
-						end = 	s.indexOf("_rgba16");
+						end = 	s.indexOf("_"+codec);
 				while(s.substring(start).startsWith("_")) start++;
 				
 				out+= "\t{\n"+
@@ -498,8 +503,13 @@ public class MapGenerator {
 			//pallette index is after image index
 			return mat.substring(0,pallette_start)+(index+1)+mat.substring(pallette_end,image_start)+index+mat.substring(image_end);
 		} else { //rgba16
+			String codec = "";
+			if(mat.contains("_rgba32")) codec = "rgba32";
+			else if(mat.contains("_i8")) codec = "i8";
+			else if(mat.contains("_i16")) codec = "i16";
+			else codec = "rgba16";
 			int 	start = mat.lastIndexOf(mesh_name),
-					end = mat.indexOf("_rgba16") + 7;
+					end = mat.indexOf("_"+codec) + (codec.length() + 1);
 			return mat.substring(0,start)+index+mat.substring(end);
 		}
 	}
