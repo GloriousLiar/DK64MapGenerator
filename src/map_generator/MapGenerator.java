@@ -53,6 +53,8 @@ public class MapGenerator {
 	
 	public static Map<String,Integer> vertexBlocks;
 	
+	public static Map<String,Integer> textureIndexMap;
+	
 	public static String mesh_name;
 	
 	//first unused index in texture table = 6013
@@ -65,9 +67,9 @@ public class MapGenerator {
 		mesh_name = args[2].replaceAll("\"", "");
 		water_exists = args[3].replaceAll("\"", "").equalsIgnoreCase("true") ? true : false;
 		texture_index = Integer.parseInt(args[4].replaceAll("\"", ""));
-		/*fileName = "C:\\Projects\\DK64\\dk64-hack-base\\blender\\floor_test\\model.c";
-		dirOut = "C:\\Projects\\DK64\\dk64-hack-base\\blender\\floor_test\\output\\";
-		mesh_name = "floor_test";
+		/*fileName = "C:\\Projects\\DK64\\Materials\\kokiro\\Documents\\kokiri\\model.c";
+		dirOut = "C:\\Projects\\DK64\\Materials\\kokiro\\Documents\\kokiri\\output\\";
+		mesh_name = "kokiri";
 		water_exists = false;
 		texture_index = 6013;*/
 		File file = new File(fileName);
@@ -131,6 +133,8 @@ public class MapGenerator {
 	}
 	
 	public static void parseImages() throws IOException {
+		textureIndexMap = new HashMap<String,Integer>();
+		
 		Files.createDirectories(Paths.get(dirOut+"/textures"));
 		Files.createDirectories(Paths.get(dirOut+"/textures/"+mesh_name));
 		
@@ -139,14 +143,21 @@ public class MapGenerator {
 		
 		int build_file_texture_index = texture_index;
 		for(String s: imageSegments) {
-			if(s.contains("_ci4_pal_") || s.contains("_ci4[]")) { //c14 and/or pallette
-				int 	start = s.indexOf(mesh_name) + mesh_name.length() + 1,
-						end = 	s.indexOf("_ci4");
+			//case for ci4/ci8 and their palette
+			if(	s.contains("_ci8[]") ||
+				s.contains("_ci4[]") ||	
+				s.contains("_pal_rgba16[]")) {
+				String codec = "";
+				if(s.contains("ci4[]")) codec = "ci4";
+				else if(s.contains("ci8[]")) codec = "ci8";
+				else if(s.contains("pal_rgba16[]")) codec = "pal_rgba16";
+				
+				int start 	= s.indexOf(mesh_name) + mesh_name.length() + 1,
+					end 	= s.indexOf("_"+codec+"[]");
 				while(s.substring(start).startsWith("_")) start++;
 				
-				boolean pallette = s.contains("ci4_pal");
-				String 	format = pallette ? "rgba5551" : "ia4",
-						name = pallette ? "_pal" : "";
+				boolean pallette = s.contains("_pal_rgba16[]");
+				String 	name = pallette ? "_pal" : "";
 				
 				out+= "\t{\n"+
 						"\t\t\"name\": \""+s.substring(start,end)+name+"\",\n" +
@@ -156,15 +167,28 @@ public class MapGenerator {
 						"\t\t\"do_not_extract\": True\n" +
 					  "\t},\n";
 				
+				//map name to index for later
+				//System.out.println((build_file_texture_index - 1)+" "+(mesh_name+"_"+s.substring(start,end)+"_"+codec));
+				textureIndexMap.put(mesh_name+"_"+s.substring(start,end)+"_"+codec, build_file_texture_index - 1);
+				
 				exportImage(s, s.substring(start,end)+name);
-			} else { //rgba16
+			} else { //other codecs
 				String codec = "";
-				if(s.contains("rgba32")) codec = "rgba32";
-				else if(s.contains("i8")) codec = "i8";
-				else if(s.contains("i16")) codec = "i16";
-				else codec = "rgba16";
+				if(s.contains("rgba32[]")) codec = "rgba32";
+				else if(s.contains("rgba16[]")) codec = "rgba16";
+				else if(s.contains("i4[]")) codec = "i4";
+				else if(s.contains("ia4[]")) codec = "ia4";
+				else if(s.contains("i8[]")) codec = "i8";
+				else if(s.contains("ia8[]")) codec = "ia8";
+				else if(s.contains("i16[]")) codec = "i16";
+				else if(s.contains("ia16[]")) codec = "ia16";
+				else {
+					System.out.println("WARNING: codec not properly identified while parsing images.");
+					System.out.println(s);
+					codec = "rgba16";
+				}
 				int 	start = s.indexOf(mesh_name) + mesh_name.length() + 1,
-						end = 	s.indexOf("_"+codec);
+						end = 	s.indexOf("_"+codec+"[]");
 				while(s.substring(start).startsWith("_")) start++;
 				
 				out+= "\t{\n"+
@@ -174,6 +198,10 @@ public class MapGenerator {
 						"\t\t\"source_file\": \"bin/"+mesh_name+"/"+s.substring(start,end)+".bin\",\n" +
 						"\t\t\"do_not_extract\": True\n" +
 					  "\t},\n";
+				
+				//map name to index for later
+				//System.out.println((build_file_texture_index - 1)+" "+s.substring(start,end));
+				textureIndexMap.put(mesh_name+"_"+s.substring(start,end)+"_"+codec, build_file_texture_index - 1);
 				
 				exportImage(s, s.substring(start,end));
 			}
@@ -471,12 +499,13 @@ public class MapGenerator {
 			cumulative_verts = Integer.parseInt(triOut.substring(triOut.indexOf("***")+3));
 			triOut= triOut.substring(0,triOut.indexOf("***"));
 			////System.out.println(cumulative_verts);
-			out+= 	cleanMaterial(material,(texture_index+(i/2)+pallette_index_modifier)) + ";\n" +
+			//out+= 	cleanMaterial(material,(texture_index+(i/2)+pallette_index_modifier)) + ";\n" +
+			out+= 	cleanMaterial(material) + ";\n" +
 					triOut + ";\n"+
 					material_revert + ";\n";
 			
-			if(!material.contains("revert") && material.contains("ci4_pal")) //materials with a pallette take up 2 indices, so increment the index modifier
-				pallette_index_modifier++;
+			//if(!material.contains("revert") && material.contains("_pal_rgba16)")) //materials with a pallette take up 2 indices, so increment the index modifier
+			//pallette_index_modifier++;
 		}
 		while(out.contains("gsSPEndDisplayList")) out = out.replace("gsSPEndDisplayList(),", "");
 		//while(out.contains("gsSPGeometryMode(0, G_FOG)")) out = out.replace("gsSPGeometryMode(0, G_FOG),", "");
@@ -487,31 +516,68 @@ public class MapGenerator {
 		fos.close();
 	}
 	
-	public static String cleanMaterial(String mat, int index) {
-		if(mat.contains("ci4_pal")) {
+	//parse out the image array names and replace them with their mapped texture indices
+	//public static String cleanMaterial(String mat, int index) {
+	public static String cleanMaterial(String mat) {
+		//case for ci4,ci8,palettes
+		if(mat.contains("_pal_rgba16)")) {
 			ArrayList<Integer> image_indices = new ArrayList<Integer>();
 			for(int i = mat.indexOf(mesh_name); i>=0; i=mat.indexOf(mesh_name, i+1)) {
+				//System.out.println(i);
 				image_indices.add(i);
+			}
+			
+			String codec = "";
+			if(mat.contains("ci4)")) codec = "ci4";
+			else if(mat.contains("ci8)")) codec = "ci8";
+			else {
+				System.out.println("WARNING: codec not properly identified for ci4,ci8 cleaning materials.");
+				System.out.println(mat);
+				codec = "ci4";
 			}
 			
 			////System.out.println(mat);
 			int pallette_start = image_indices.get(1), //pallette is second mesh_name reference after variable name
-				pallette_end = mat.indexOf("ci4_pal_rgba16") + 14;
+				pallette_end = mat.indexOf("_pal_rgba16)") + 11;
 			int	image_start = image_indices.get(2), //image is third mesh_name reference
-				image_end = mat.indexOf("_ci4)") + 4;
+				image_end = mat.indexOf("_"+codec+")") + 4;
+			
+			int tex_index = getTextureIndex(mat.substring(image_start,image_end)),
+				pallette_index = getTextureIndex(mat.substring(pallette_start, pallette_end));
 			
 			//pallette index is after image index
-			return mat.substring(0,pallette_start)+(index+1)+mat.substring(pallette_end,image_start)+index+mat.substring(image_end);
+			return mat.substring(0,pallette_start)+pallette_index+mat.substring(pallette_end,image_start)+tex_index+mat.substring(image_end);
 		} else { //rgba16
 			String codec = "";
-			if(mat.contains("_rgba32")) codec = "rgba32";
-			else if(mat.contains("_i8")) codec = "i8";
-			else if(mat.contains("_i16")) codec = "i16";
-			else codec = "rgba16";
-			int 	start = mat.lastIndexOf(mesh_name),
-					end = mat.indexOf("_"+codec) + (codec.length() + 1);
-			return mat.substring(0,start)+index+mat.substring(end);
+			if(mat.contains("rgba32)")) codec = "rgba32";
+			else if(mat.contains("rgba16)")) codec = "rgba16";
+			else if(mat.contains("i4)")) codec = "i4";
+			else if(mat.contains("ia4)")) codec = "ia4";
+			else if(mat.contains("i8)")) codec = "i8";
+			else if(mat.contains("ia8)")) codec = "ia8";
+			else if(mat.contains("i16)")) codec = "i16";
+			else if(mat.contains("ia16)")) codec = "ia16";
+			else {
+				System.out.println("WARNING: codec not properly identified while cleaning materials.");
+				System.out.println(mat);
+				codec = "rgba16";
+			}
+			//iterate over all image names and replace them with their indices in texture table 25 mapped earlier
+			while(mat.indexOf(mesh_name,mat.indexOf(mesh_name) + mesh_name.length()) > 0) {
+				int 	start = mat.indexOf(mesh_name,mat.indexOf(mesh_name) + mesh_name.length()),
+						end = mat.indexOf("_"+codec+")") + (codec.length() + 1);
+				//System.out.println(start+" "+end);
+				int tex_index = getTextureIndex(mat.substring(start,end));
+						
+				mat = mat.replaceAll(mat.substring(start,end),""+tex_index);
+			}
+			return mat;
 		}
+	}
+	
+	public static int getTextureIndex(String textureName) {
+		//System.out.println("GET "+textureName);
+		return textureIndexMap.get(textureName);
 	}
 	
 	public static String cleanTriBlock(String tris, int verts) {
